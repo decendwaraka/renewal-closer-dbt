@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Renewals Closer Dashboard</title>
+<style>
+:root{--bg:#0B1628;--card:#152035;--bdr:rgba(255,255,255,0.07);--t1:#FFFFFF;--t2:#8FA0B5;--t3:#4A5E73;--gold:#FFB627;--silver:#B8C0CC;--bronze:#E89B5C;--acc:#4A7BC8;--grn:#4CAF82;--red:#E05C5C;--ylw:#F0B429;--purple:#9B8EC4;--fire:#FF6B35;--div:rgba(255,255,255,0.06);--emerald:#2ECC8A}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Inter",sans-serif;font-size:13px;color:var(--t1)}
+.dash{padding:18px 20px;min-height:100vh}
+.top-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.top-bar h1{font-size:17px;font-weight:600}
+.sub{font-size:11px;color:var(--t2);margin-top:2px}
+.slbl{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--t3);margin-bottom:9px}
+.up{color:var(--grn)}.dn{color:var(--red)}
+/* today */
+.today-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.today-card{background:linear-gradient(135deg,rgba(46,204,138,0.1),rgba(46,204,138,0.04));border:1px solid rgba(46,204,138,0.2);border-radius:8px;padding:11px 14px;display:flex;align-items:center;gap:10px}
+.today-card.fire-card{background:linear-gradient(135deg,rgba(255,107,53,0.15),rgba(255,107,53,0.05));border-color:rgba(255,107,53,0.35)}
+.today-icon{width:34px;height:34px;border-radius:6px;background:rgba(46,204,138,0.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:17px}
+.today-card.fire-card .today-icon{background:rgba(255,107,53,0.2)}
+.today-lbl{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--t3)}
+.today-val{font-size:18px;font-weight:700;line-height:1.2;margin-top:2px}
+.today-val.fire-val{font-size:15px;color:var(--fire)}
+.today-sub{font-size:10px;color:var(--t2);margin-top:2px}
+.fire-name{color:var(--fire);font-weight:600}
+/* leaderboards */
+.lbs{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.lb{background:var(--card);border:1px solid var(--bdr);border-radius:8px;padding:13px 13px 15px;position:relative;overflow:hidden}
+.lb::after{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.lb.l-gold::after{background:var(--gold)}.lb.l-grn::after{background:var(--emerald)}.lb.l-acc::after{background:var(--acc)}.lb.l-purple::after{background:var(--purple)}
+.lb-ttl{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--t2);margin-bottom:2px}
+.lb-hero{font-size:22px;font-weight:700;line-height:1}
+.lb-hero span{font-size:11px;font-weight:400;color:var(--t3);margin-left:3px}
+.lb-meta{margin-top:6px;margin-bottom:2px}
+.pb-row{display:flex;justify-content:space-between;font-size:9px;color:var(--t3);margin-bottom:3px}
+.pb-track{background:rgba(255,255,255,0.07);border-radius:99px;height:3px;overflow:hidden;margin-bottom:5px}
+.pb-fill{height:100%;border-radius:99px}
+.mom-row{display:flex;align-items:center;gap:5px;margin-bottom:11px}
+.mom-badge{font-size:9px;font-weight:600;padding:1px 5px;border-radius:3px;white-space:nowrap}
+.mom-up{background:rgba(76,175,130,0.15);color:var(--grn)}
+.mom-dn{background:rgba(224,92,92,0.15);color:var(--red)}
+.mom-lbl{font-size:9px;color:var(--t3)}
+/* rep rows */
+.rr{display:flex;align-items:flex-start;gap:7px;margin-bottom:10px}.rr:last-child{margin-bottom:0}
+.rr.on-fire{background:rgba(255,107,53,0.07);border:1px solid rgba(255,107,53,0.2);border-radius:6px;padding:4px 5px;margin:-4px -5px 6px}
+.rr.on-fire:last-child{margin-bottom:-4px}
+.rr.dim{opacity:0.38}
+.av{width:27px;height:27px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:700;color:#fff;flex-shrink:0;position:relative;margin-top:1px}
+.rd{position:absolute;bottom:-2px;right:-2px;width:13px;height:13px;border-radius:50%;background:#2A3A55;border:1.5px solid var(--card);font-size:7.5px;font-weight:700;display:flex;align-items:center;justify-content:center;color:var(--t2)}
+.r1 .rd{background:var(--gold);color:#1A1A1A}.r2 .rd{background:var(--silver);color:#1A1A1A}.r3 .rd{background:var(--bronze);color:#1A1A1A}
+.ri{flex:1;min-width:0}.rn-row{display:flex;align-items:center;gap:5px}
+.rn{font-size:11px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fire-badge{font-size:9px;font-weight:700;color:var(--fire);background:rgba(255,107,53,0.15);padding:1px 5px;border-radius:3px;white-space:nowrap;flex-shrink:0}
+.rbt{background:rgba(255,255,255,0.07);border-radius:99px;height:3px;margin-top:3px;overflow:hidden}
+.rbf{height:100%;border-radius:99px}
+.r1 .rbf{background:var(--gold)}.r2 .rbf{background:var(--silver)}.r3 .rbf{background:var(--bronze)}.r4 .rbf{background:var(--acc)}
+.gap{font-size:9px;color:var(--t3);margin-top:2px}.gap-val{color:var(--ylw)}
+.rv{flex-shrink:0;text-align:right;min-width:48px;padding-top:1px}
+.rv-main{font-size:12px;font-weight:600}
+.av-sp{background:#C4893A}.av-er{background:#3B8B6E}.av-au{background:#4A7BC8}.av-md{background:#9B5EA3}.av-cp{background:#4A5E73}.av-td{background:#5A6B4A}.av-th{background:#7A5A3A}
+.inactive-note{font-size:9px;color:var(--t3);font-style:italic;margin-left:4px}
+/* tables */
+.divider{height:1px;background:rgba(255,255,255,0.05);margin:16px 0}
+.tc{background:var(--card);border:1px solid var(--bdr);border-radius:8px;padding:14px 16px 16px;margin-bottom:12px;overflow-x:auto}
+.tc-ttl{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.7px;margin-bottom:2px}
+.tc-sub{font-size:10px;color:var(--t3);margin-bottom:13px}
+table{width:100%;border-collapse:collapse}
+th{font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:.4px;color:var(--t2);padding:6px 7px;text-align:right;border-bottom:1px solid var(--div);white-space:nowrap}
+th.l,td.l{text-align:left}
+td{font-size:11.5px;padding:8px 7px;text-align:right;border-bottom:1px solid rgba(255,255,255,.025);color:var(--t1);white-space:nowrap}
+tr:nth-child(even) td{background:rgba(255,255,255,.015)}
+.tr td{font-weight:600;border-top:1px solid var(--div);border-bottom:none;padding-top:9px}
+.ec{display:flex;align-items:center;gap:7px;min-width:120px}
+.avsm{width:20px;height:20px;border-radius:50%;font-size:8.5px;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.hi{color:var(--grn)}.mi{color:var(--ylw)}.lo{color:var(--red)}
+.cs{border-left:1px solid rgba(255,255,255,.06)}
+.mm-col{background:rgba(155,142,196,0.06)}.acc-col{background:rgba(76,175,130,0.06)}.oth-col{background:rgba(255,255,255,0.02)}
+.grp-lbl{font-size:8.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:5px 7px 4px;border-bottom-width:2px!important}
+.grp-mm{color:#9B8EC4;border-bottom-color:rgba(155,142,196,0.45)!important}
+.grp-acc{color:#4CAF82;border-bottom-color:rgba(76,175,130,0.45)!important}
+.grp-oth{color:var(--t3);border-bottom-color:rgba(255,255,255,0.1)!important}
+details{margin-top:24px;background:var(--card);border:1px solid var(--bdr);border-radius:8px;padding:12px 16px}
+summary{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.7px;color:var(--t3);cursor:pointer;user-select:none}
+.cl{margin-top:12px;font-size:11px;color:var(--t2);line-height:1.7}
+.cl h4{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--t3);margin-top:10px;margin-bottom:4px}
+.cl h4:first-child{margin-top:0}
+.cl li{margin-left:16px;margin-bottom:2px}
+</style>
+</head>
+<body>
+<div class="dash">
+  <div class="top-bar">
+    <div><h1>Renewals closer dashboard</h1><div class="sub">June 2026 &middot; MTD &middot; HubSpot live &middot; 18 days remaining &middot; Travis (Renewals Manager)</div></div>
+  </div>
+
+  <!-- Leaderboards -->
+  <div class="slbl">Leaderboards &middot; current month</div>
+  <div class="lbs">
+    <div class="lb l-gold">
+      <div class="lb-ttl">The rainmaker</div>
+      <div class="lb-hero">$246K <span>total cash</span></div>
+      <div class="lb-meta">
+        <div class="pb-row"><span>70% to $350K goal</span></div>
+        <div class="pb-track"><div class="pb-fill" style="width:70%;background:var(--gold)"></div></div>
+        <div class="mom-row"><span class="mom-badge mom-up">&#8593; $158K</span><span class="mom-lbl">vs May MTD</span></div>
+      </div>
+      <div class="rr r1 on-fire"><div class="av av-sp">SP<div class="rd">1</div></div><div class="ri"><div class="rn-row"><div class="rn">Sufjan Peter</div><div class="fire-badge">&#128293; on fire</div></div><div class="rbt"><div class="rbf" style="width:100%"></div></div></div><div class="rv"><div class="rv-main">$102K</div></div></div>
+      <div class="rr r2"><div class="av av-er">ER<div class="rd">2</div></div><div class="ri"><div class="rn">Elisabeth Rogers</div><div class="rbt"><div class="rbf" style="width:60%"></div></div><div class="gap">&#8593; <span class="gap-val">$41K</span></div></div><div class="rv"><div class="rv-main">$61K</div></div></div>
+      <div class="rr r3"><div class="av av-au">AU<div class="rd">3</div></div><div class="ri"><div class="rn">Abe Underwood</div><div class="rbt"><div class="rbf" style="width:41%"></div></div><div class="gap">&#8593; <span class="gap-val">$19K</span></div></div><div class="rv"><div class="rv-main">$42K</div></div></div>
+      <div class="rr r4"><div class="av av-md">MD<div class="rd">4</div></div><div class="ri"><div class="rn">Melissa Davis</div><div class="rbt"><div class="rbf" style="width:40%"></div></div><div class="gap">&#8593; <span class="gap-val">$1K</span></div></div><div class="rv"><div class="rv-main">$41K</div></div></div>
+      <div class="rr dim"><div class="av av-cp">CP</div><div class="ri"><div class="rn-row"><div class="rn">Cole Parsons</div><span class="inactive-note">no activity</span></div></div><div class="rv"><div class="rv-main" style="color:var(--t3)">$0</div></div></div>
+    </div>
+    <div class="lb l-grn">
+      <div class="lb-ttl">Mayo connoisseur</div>
+      <div class="lb-hero">21 <span>deals won</span></div>
+      <div class="lb-meta">
+        <div class="pb-row"><span>70% to 30 deal goal</span></div>
+        <div class="pb-track"><div class="pb-fill" style="width:70%;background:var(--emerald)"></div></div>
+        <div class="mom-row"><span class="mom-badge mom-up">&#8593; 14 deals</span><span class="mom-lbl">vs May MTD</span></div>
+      </div>
+      <div class="rr r1 on-fire"><div class="av av-sp">SP<div class="rd">1</div></div><div class="ri"><div class="rn-row"><div class="rn">Sufjan Peter</div><div class="fire-badge">&#128293; on fire</div></div><div class="rbt"><div class="rbf" style="width:100%"></div></div></div><div class="rv"><div class="rv-main">9</div></div></div>
+      <div class="rr r2"><div class="av av-er">ER<div class="rd">2</div></div><div class="ri"><div class="rn">Elisabeth Rogers</div><div class="rbt"><div class="rbf" style="width:67%"></div></div><div class="gap">&#8593; <span class="gap-val">3</span></div></div><div class="rv"><div class="rv-main">6</div></div></div>
+      <div class="rr r3"><div class="av av-au">AU<div class="rd">3</div></div><div class="ri"><div class="rn">Abe Underwood</div><div class="rbt"><div class="rbf" style="width:33%"></div></div><div class="gap">&#8593; <span class="gap-val">3</span></div></div><div class="rv"><div class="rv-main">3</div></div></div>
+      <div class="rr r4"><div class="av av-md">MD<div class="rd">4</div></div><div class="ri"><div class="rn">Melissa Davis</div><div class="rbt"><div class="rbf" style="width:33%"></div></div><div class="gap"><span class="gap-val">tied</span></div></div><div class="rv"><div class="rv-main">3</div></div></div>
+      <div class="rr dim"><div class="av av-td">TD</div><div class="ri"><div class="rn-row"><div class="rn">Travis Drolet</div><span class="inactive-note">no activity</span></div></div><div class="rv"><div class="rv-main" style="color:var(--t3)">0</div></div></div>
+    </div>
+    <div class="lb l-acc">
+      <div class="lb-ttl">Live call close %</div>
+      <div class="lb-hero">23% <span>team avg</span></div>
+      <div class="lb-meta">
+        <div class="pb-row"><span>Target 30%</span></div>
+        <div class="pb-track"><div class="pb-fill" style="width:77%;background:var(--acc)"></div></div>
+        <div class="mom-row"><span class="mom-badge mom-up">&#8593; 5pp</span><span class="mom-lbl">vs May MTD</span></div>
+      </div>
+      <div class="rr r1 on-fire"><div class="av av-sp">SP<div class="rd">1</div></div><div class="ri"><div class="rn-row"><div class="rn">Sufjan Peter</div><div class="fire-badge">&#128293; on fire</div></div><div class="rbt"><div class="rbf" style="width:100%"></div></div></div><div class="rv"><div class="rv-main">28%</div></div></div>
+      <div class="rr r2"><div class="av av-er">ER<div class="rd">2</div></div><div class="ri"><div class="rn">Elisabeth Rogers</div><div class="rbt"><div class="rbf" style="width:82%"></div></div><div class="gap">&#8593; <span class="gap-val">5pp</span></div></div><div class="rv"><div class="rv-main">23%</div></div></div>
+      <div class="rr r3"><div class="av av-au">AU<div class="rd">3</div></div><div class="ri"><div class="rn">Abe Underwood</div><div class="rbt"><div class="rbf" style="width:71%"></div></div><div class="gap">&#8593; <span class="gap-val">3pp</span></div></div><div class="rv"><div class="rv-main">20%</div></div></div>
+      <div class="rr r4"><div class="av av-md">MD<div class="rd">4</div></div><div class="ri"><div class="rn">Melissa Davis</div><div class="rbt"><div class="rbf" style="width:64%"></div></div><div class="gap">&#8593; <span class="gap-val">2pp</span></div></div><div class="rv"><div class="rv-main">18%</div></div></div>
+      <div class="rr dim"><div class="av av-th">TH</div><div class="ri"><div class="rn-row"><div class="rn">Troy Horton</div><span class="inactive-note">no activity</span></div></div><div class="rv"><div class="rv-main" style="color:var(--t3)">0%</div></div></div>
+    </div>
+    <div class="lb l-purple">
+      <div class="lb-ttl">Most valuable asset</div>
+      <div class="lb-hero">$2,833 <span>avg DPL</span></div>
+      <div class="lb-meta">
+        <div class="pb-row"><span>Target $3,500</span></div>
+        <div class="pb-track"><div class="pb-fill" style="width:81%;background:var(--purple)"></div></div>
+        <div class="mom-row"><span class="mom-badge mom-up">&#8593; $421</span><span class="mom-lbl">vs May MTD</span></div>
+      </div>
+      <div class="rr r1 on-fire"><div class="av av-sp">SP<div class="rd">1</div></div><div class="ri"><div class="rn-row"><div class="rn">Sufjan Peter</div><div class="fire-badge">&#128293; on fire</div></div><div class="rbt"><div class="rbf" style="width:100%"></div></div></div><div class="rv"><div class="rv-main">$12,858</div></div></div>
+      <div class="rr r2"><div class="av av-md">MD<div class="rd">2</div></div><div class="ri"><div class="rn">Melissa Davis</div><div class="rbt"><div class="rbf" style="width:18.5%"></div></div><div class="gap">&#8593; <span class="gap-val">$10.5K</span></div></div><div class="rv"><div class="rv-main">$2,382</div></div></div>
+      <div class="rr r3"><div class="av av-er">ER<div class="rd">3</div></div><div class="ri"><div class="rn">Elisabeth Rogers</div><div class="rbt"><div class="rbf" style="width:17.5%"></div></div><div class="gap">&#8593; <span class="gap-val">$131</span></div></div><div class="rv"><div class="rv-main">$2,251</div></div></div>
+      <div class="rr r4"><div class="av av-au">AU<div class="rd">4</div></div><div class="ri"><div class="rn">Abe Underwood</div><div class="rbt"><div class="rbf" style="width:9.4%"></div></div><div class="gap">&#8593; <span class="gap-val">$1,042</span></div></div><div class="rv"><div class="rv-main">$1,209</div></div></div>
+      <div class="rr dim"><div class="av av-cp">CP</div><div class="ri"><div class="rn-row"><div class="rn">Cole Parsons</div><span class="inactive-note">no activity</span></div></div><div class="rv"><div class="rv-main" style="color:var(--t3)">$0</div></div></div>
+    </div>
+  </div>
+
+  <!-- Today -->
+  <div class="slbl">Today &middot; June 16</div>
+  <div class="today-strip" style="margin-bottom:16px">
+    <div class="today-card"><div class="today-icon">&#128222;</div><div><div class="today-lbl">Live calls today</div><div class="today-val">18</div><div class="today-sub"><span class="up">&#8593; 4</span> vs yesterday</div></div></div>
+    <div class="today-card"><div class="today-icon">&#129309;</div><div><div class="today-lbl">Deals closed today</div><div class="today-val">2</div><div class="today-sub">$22K cash closed</div></div></div>
+    <div class="today-card"><div class="today-icon">&#128181;</div><div><div class="today-lbl">Cash closed today</div><div class="today-val">$22K</div><div class="today-sub"><span class="up">&#8593; $6K</span> vs yesterday</div></div></div>
+    <div class="today-card fire-card"><div class="today-icon">&#128293;</div><div><div class="today-lbl">On fire today</div><div class="today-val fire-val">Sufjan Peter</div><div class="today-sub"><span class="fire-name">2 closes &middot; $22K</span></div></div></div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- Call outcomes -->
+  <div class="slbl">Call outcomes</div>
+  <div class="tc">
+    <div class="tc-sub">PC = Progress call &middot; RC = Renewal call &middot; current month</div>
+    <table><thead><tr>
+      <th></th><th class="l">Employee</th>
+      <th style="color:#6BACE6">PC Invited</th><th style="color:#6BACE6">PC Booked</th><th style="color:#6BACE6">PC Completed</th><th style="color:#6BACE6">PC Book%</th><th style="color:#6BACE6">PC Show%</th><th style="color:#6BACE6">PC Close%</th>
+      <th class="cs" style="color:#3BBFAD">RC Invited</th><th style="color:#3BBFAD">RC Booked</th><th style="color:#3BBFAD">RC Completed</th><th style="color:#3BBFAD">RC Book%</th><th style="color:#3BBFAD">RC Show%</th><th style="color:#3BBFAD">RC Close%</th>
+    </tr></thead>
+    <tbody>
+      <tr><td>1</td><td class="l"><div class="ec"><div class="avsm av-sp">SP</div>Sufjan Peter</div></td><td>8</td><td>0</td><td>0</td><td class="lo">0%</td><td class="lo">0%</td><td class="lo">0%</td><td class="cs">76</td><td>1</td><td>0</td><td class="lo">1%</td><td class="lo">0%</td><td class="hi">100%</td></tr>
+      <tr><td>2</td><td class="l"><div class="ec"><div class="avsm av-er">ER</div>Elisabeth Rogers</div></td><td>28</td><td>6</td><td>2</td><td class="mi">21%</td><td class="mi">33%</td><td class="mi">33%</td><td class="cs">42</td><td>1</td><td>0</td><td class="lo">2%</td><td class="lo">0%</td><td class="hi">100%</td></tr>
+      <tr><td>3</td><td class="l"><div class="ec"><div class="avsm av-au">AU</div>Abe Underwood</div></td><td>35</td><td>13</td><td>5</td><td class="mi">37%</td><td class="hi">38%</td><td class="hi">60%</td><td class="cs">27</td><td>0</td><td>0</td><td class="lo">0%</td><td class="lo">0%</td><td class="lo">0%</td></tr>
+      <tr><td>4</td><td class="l"><div class="ec"><div class="avsm av-md">MD</div>Melissa Davis</div></td><td>17</td><td>5</td><td>2</td><td class="mi">29%</td><td class="hi">40%</td><td class="hi">50%</td><td class="cs">30</td><td>0</td><td>0</td><td class="lo">0%</td><td class="lo">0%</td><td class="lo">0%</td></tr>
+      <tr><td>5</td><td class="l"><div class="ec"><div class="avsm av-cp">CP</div>Cole Parsons</div></td><td>0</td><td>0</td><td>0</td><td class="lo">0%</td><td class="lo">0%</td><td class="lo">0%</td><td class="cs">3</td><td>0</td><td>0</td><td class="lo">0%</td><td class="lo">0%</td><td class="lo">0%</td></tr>
+      <tr class="tr"><td></td><td class="l">Average</td><td>13</td><td>3</td><td>1</td><td>4%</td><td>5%</td><td>29%</td><td class="cs">26</td><td>0</td><td>0</td><td>0%</td><td>0%</td><td>14%</td></tr>
+    </tbody></table>
+  </div>
+
+  <!-- Cash by pipeline -->
+  <div class="slbl">Cash by pipeline type</div>
+  <div class="tc">
+    <div class="tc-sub">Cash collected per closer by renewal term and product</div>
+    <table><thead>
+      <tr><th colspan="2" style="border:none;padding:0"></th><th colspan="4" class="grp-lbl grp-mm" style="text-align:center">Mastermind Renewals</th><th colspan="4" class="grp-lbl grp-acc cs" style="text-align:center">ACC Renewals</th><th colspan="2" class="grp-lbl grp-oth cs" style="text-align:center">Other</th><th colspan="4" style="border:none;padding:0"></th></tr>
+      <tr><th></th><th class="l">Employee</th><th class="mm-col">MM T1</th><th class="mm-col">MM T2</th><th class="mm-col">MM T3</th><th class="mm-col">MM Restart</th><th class="acc-col cs">ACC T1</th><th class="acc-col">ACC T2</th><th class="acc-col">ACC Upgrade</th><th class="acc-col">ACC Restart</th><th class="oth-col cs">MM Upgrade</th><th class="oth-col">Referral</th><th class="cs">Total</th><th># closed</th><th>Close%</th><th>vs May MTD</th></tr>
+    </thead><tbody>
+      <tr><td>1</td><td class="l"><div class="ec"><div class="avsm av-sp">SP</div>Sufjan Peter</div></td><td class="mm-col">$38K</td><td class="mm-col">$24K</td><td class="mm-col">$18K</td><td class="mm-col">$5K</td><td class="acc-col cs">$9K</td><td class="acc-col">$5K</td><td class="acc-col">$2K</td><td class="acc-col">$1.5K</td><td class="oth-col cs">$0</td><td class="oth-col">$0.4K</td><td class="cs">$102K</td><td>9</td><td class="hi">100%</td><td class="hi">+$65K</td></tr>
+      <tr><td>2</td><td class="l"><div class="ec"><div class="avsm av-er">ER</div>Elisabeth Rogers</div></td><td class="mm-col">$22K</td><td class="mm-col">$14K</td><td class="mm-col">$10K</td><td class="mm-col">$3K</td><td class="acc-col cs">$5K</td><td class="acc-col">$3K</td><td class="acc-col">$2K</td><td class="acc-col">$1K</td><td class="oth-col cs">$0</td><td class="oth-col">$0.7K</td><td class="cs">$61K</td><td>6</td><td class="hi">100%</td><td class="hi">+$40K</td></tr>
+      <tr><td>3</td><td class="l"><div class="ec"><div class="avsm av-au">AU</div>Abe Underwood</div></td><td class="mm-col">$16K</td><td class="mm-col">$10K</td><td class="mm-col">$7K</td><td class="mm-col">$2K</td><td class="acc-col cs">$4K</td><td class="acc-col">$2K</td><td class="acc-col">$1K</td><td class="acc-col">$0</td><td class="oth-col cs">$0</td><td class="oth-col">$0.3K</td><td class="cs">$42K</td><td>3</td><td class="hi">100%</td><td class="hi">+$29K</td></tr>
+      <tr><td>4</td><td class="l"><div class="ec"><div class="avsm av-md">MD</div>Melissa Davis</div></td><td class="mm-col">$15K</td><td class="mm-col">$10K</td><td class="mm-col">$7K</td><td class="mm-col">$2K</td><td class="acc-col cs">$3K</td><td class="acc-col">$2K</td><td class="acc-col">$1K</td><td class="acc-col">$0.5K</td><td class="oth-col cs">$0</td><td class="oth-col">$0.5K</td><td class="cs">$41K</td><td>3</td><td class="hi">100%</td><td class="hi">+$24K</td></tr>
+      <tr><td>5</td><td class="l"><div class="ec"><div class="avsm av-cp">CP</div>Cole Parsons</div></td><td class="mm-col">$0</td><td class="mm-col">$0</td><td class="mm-col">$0</td><td class="mm-col">$0</td><td class="acc-col cs">$0</td><td class="acc-col">$0</td><td class="acc-col">$0</td><td class="acc-col">$0</td><td class="oth-col cs">$0</td><td class="oth-col">$0</td><td class="cs">$0</td><td>0</td><td class="lo">0%</td><td style="color:var(--t3)">&#8212;</td></tr>
+      <tr class="tr"><td></td><td class="l">Team total</td><td class="mm-col">&#8212;</td><td class="mm-col">&#8212;</td><td class="mm-col">&#8212;</td><td class="mm-col">&#8212;</td><td class="acc-col cs">&#8212;</td><td class="acc-col">&#8212;</td><td class="acc-col">&#8212;</td><td class="acc-col">&#8212;</td><td class="oth-col cs">&#8212;</td><td class="oth-col">&#8212;</td><td class="cs">$246K</td><td>21</td><td>100%</td><td class="hi">+$158K</td></tr>
+    </tbody></table>
+  </div>
+
+  <!-- HubSpot pipeline -->
+  <div class="slbl">HubSpot pipeline &middot; deal stages</div>
+  <div class="tc">
+    <div class="tc-sub">Live deal stage snapshot &middot; current month</div>
+    <table><thead>
+      <tr>
+        <th colspan="2" style="border:none;padding:0"></th>
+        <th colspan="5" class="grp-lbl grp-mm" style="text-align:center">Progress Call</th>
+        <th colspan="4" class="grp-lbl grp-acc cs" style="text-align:center">Renewal Call</th>
+        <th colspan="4" class="grp-lbl grp-oth cs" style="text-align:center">Other</th>
+        <th style="border:none;padding:0"></th>
+      </tr>
+      <tr>
+        <th></th><th class="l">Employee</th>
+        <th class="mm-col">Due</th><th class="mm-col">Invited</th><th class="mm-col">Scheduled</th><th class="mm-col">Not Cmplt</th><th class="mm-col">Completed</th>
+        <th class="acc-col cs">Due</th><th class="acc-col">Invited</th><th class="acc-col">Scheduled</th><th class="acc-col">Not Cmplt</th>
+        <th class="oth-col cs">Nurture</th><th class="oth-col">Redzone</th><th class="oth-col">Closed Won</th><th class="oth-col">Closed Lost</th>
+        <th class="cs">Total</th>
+      </tr>
+    </thead><tbody>
+      <tr><td>1</td><td class="l"><div class="ec"><div class="avsm av-sp">SP</div>Sufjan Peter</div></td><td class="mm-col">3</td><td class="mm-col">2</td><td class="mm-col">0</td><td class="mm-col">1</td><td class="mm-col">0</td><td class="acc-col cs">1</td><td class="acc-col">0</td><td class="acc-col">1</td><td class="acc-col">0</td><td class="oth-col cs">0</td><td class="oth-col">0</td><td class="oth-col hi">9</td><td class="oth-col lo">0</td><td class="cs">8</td></tr>
+      <tr><td>2</td><td class="l"><div class="ec"><div class="avsm av-er">ER</div>Elisabeth Rogers</div></td><td class="mm-col">4</td><td class="mm-col">6</td><td class="mm-col">4</td><td class="mm-col">3</td><td class="mm-col">2</td><td class="acc-col cs">1</td><td class="acc-col">1</td><td class="acc-col">1</td><td class="acc-col">0</td><td class="oth-col cs">2</td><td class="oth-col">0</td><td class="oth-col hi">6</td><td class="oth-col lo">1</td><td class="cs">28</td></tr>
+      <tr><td>3</td><td class="l"><div class="ec"><div class="avsm av-au">AU</div>Abe Underwood</div></td><td class="mm-col">5</td><td class="mm-col">8</td><td class="mm-col">7</td><td class="mm-col">4</td><td class="mm-col">5</td><td class="acc-col cs">0</td><td class="acc-col">2</td><td class="acc-col">0</td><td class="acc-col">1</td><td class="oth-col cs">3</td><td class="oth-col">0</td><td class="oth-col hi">3</td><td class="oth-col lo">2</td><td class="cs">35</td></tr>
+      <tr><td>4</td><td class="l"><div class="ec"><div class="avsm av-md">MD</div>Melissa Davis</div></td><td class="mm-col">2</td><td class="mm-col">3</td><td class="mm-col">3</td><td class="mm-col">2</td><td class="mm-col">2</td><td class="acc-col cs">0</td><td class="acc-col">1</td><td class="acc-col">0</td><td class="acc-col">0</td><td class="oth-col cs">1</td><td class="oth-col">0</td><td class="oth-col hi">3</td><td class="oth-col lo">0</td><td class="cs">17</td></tr>
+      <tr><td>5</td><td class="l"><div class="ec"><div class="avsm av-cp">CP</div>Cole Parsons</div></td><td class="mm-col">0</td><td class="mm-col">0</td><td class="mm-col">0</td><td class="mm-col">0</td><td class="mm-col">0</td><td class="acc-col cs">0</td><td class="acc-col">0</td><td class="acc-col">0</td><td class="acc-col">0</td><td class="oth-col cs">1</td><td class="oth-col">0</td><td class="oth-col lo">0</td><td class="oth-col lo">0</td><td class="cs">2</td></tr>
+      <tr class="tr"><td></td><td class="l">Total</td><td class="mm-col">14</td><td class="mm-col">19</td><td class="mm-col">14</td><td class="mm-col">10</td><td class="mm-col">9</td><td class="acc-col cs">2</td><td class="acc-col">4</td><td class="acc-col">2</td><td class="acc-col">1</td><td class="oth-col cs">7</td><td class="oth-col">0</td><td class="oth-col">21</td><td class="oth-col">3</td><td class="cs">90</td></tr>
+    </tbody></table>
+  </div>
+
+  <!-- Booking & show rates -->
+  <div class="tc">
+    <div class="tc-ttl">Booking &amp; show rates</div>
+    <div class="tc-sub">Current month &middot; per closer</div>
+    <table><thead><tr><th></th><th class="l">Employee</th><th style="color:#6BACE6">PC Book%</th><th style="color:#6BACE6">PC Show%</th><th class="cs" style="color:#3BBFAD">RC Book%</th><th style="color:#3BBFAD">RC Show%</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td class="l"><div class="ec"><div class="avsm av-au">AU</div>Abe Underwood</div></td><td class="hi">37%</td><td class="hi">38%</td><td class="cs lo">0%</td><td class="lo">0%</td></tr>
+      <tr><td>2</td><td class="l"><div class="ec"><div class="avsm av-cp">CP</div>Cole Parsons</div></td><td class="lo">0%</td><td class="lo">0%</td><td class="cs lo">0%</td><td class="lo">0%</td></tr>
+      <tr><td>3</td><td class="l"><div class="ec"><div class="avsm av-er">ER</div>Elisabeth Rogers</div></td><td class="mi">21%</td><td class="mi">33%</td><td class="cs lo">2%</td><td class="lo">0%</td></tr>
+      <tr><td>4</td><td class="l"><div class="ec"><div class="avsm av-md">MD</div>Melissa Davis</div></td><td class="mi">29%</td><td class="hi">40%</td><td class="cs lo">0%</td><td class="lo">0%</td></tr>
+      <tr><td>5</td><td class="l"><div class="ec"><div class="avsm av-sp">SP</div>Sufjan Peter</div></td><td class="lo">0%</td><td class="lo">0%</td><td class="cs lo">1%</td><td class="lo">0%</td></tr>
+      <tr class="tr"><td></td><td class="l">Average</td><td>4%</td><td>5%</td><td class="cs">0%</td><td>0%</td></tr>
+    </tbody></table>
+  </div>
+
+  <details>
+    <summary>Notes for tech</summary>
+    <div class="cl">
+      <h4>Data to wire to HubSpot</h4>
+      <ul>
+        <li>All figures are placeholder — wire to HubSpot live queries per closer (owner ID)</li>
+        <li>$350K cash goal is placeholder — confirm actual closer team monthly target</li>
+        <li>MoM badges: compare current MTD vs same elapsed days in prior month</li>
+        <li>On fire: top closer by cash closed today</li>
+        <li>Color coding: green ≥ target, yellow 60–99%, red &lt; 60%</li>
+      </ul>
+      <h4>Deal stages (HubSpot pipeline)</h4>
+      <ul>
+        <li>Progress Call: Due, Invited, Scheduled, Not Completed, Completed</li>
+        <li>Renewal Call: Due, Invited, Scheduled, Not Completed</li>
+        <li>Other: Nurture, Redzone, Closed Won, Closed Lost</li>
+      </ul>
+    </div>
+  </details>
+</div>
+</body>
+</html>

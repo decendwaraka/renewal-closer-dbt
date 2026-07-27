@@ -1,0 +1,14 @@
+version: 2
+
+models:
+  - name: stg_renewal__deals
+    description: "One row per HubSpot deal, renamed. Cash columns limited to what Fivetran syncs today (OPEN_ISSUES #1)."
+    columns:
+      - name: deal_id
+        tests: [unique, not_null]
+
+  - name: stg_renewal__meetings
+    description: "One row per meeting engagement. Renewal PC/RC/PWC calls categorized downstream."
+    columns:
+      - name: meeting_id
+        tests: [unique, not_null]

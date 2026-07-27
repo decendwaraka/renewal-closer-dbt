@@ -1,0 +1,41 @@
+version: 2
+
+models:
+  - name: fct_renewal_cash
+    description: "Payment-grain cash fact (base+AP1+AP2 today; OPEN_ISSUES #1). ET-dated, with product attrs."
+    # cash_amount non-negativity enforced by tests/assert_cash_nonnegative.sql (no dbt_utils dependency)
+
+  - name: fct_renewal_meetings
+    description: "Meeting-grain fact: PC/RC/PWC category + booked/completed flags."
+    columns:
+      - name: meeting_id
+        tests: [unique, not_null]
+      - name: meeting_category
+        tests:
+          - accepted_values:
+              values: ['PC', 'RC', 'PWC']
+      - name: meeting_outcome
+        tests:
+          - accepted_values:
+              # Known values incl. sub-outcomes found in data (OPEN_ISSUES #7). warn (not error) so a
+              # genuinely new outcome value surfaces without breaking the build.
+              severity: warn
+              values:
+                - 'COMPLETED'
+                - 'COMPLETED - NURTURE'
+                - 'COMPLETED - QUALIFIED'
+                - 'COMPLETED - DQ'
+                - 'CANCELED'
+                - 'CANCELLED'
+                - 'NO_SHOW'
+                - 'RESCHEDULED'
+                - 'SCHEDULED'
+
+  - name: fct_renewal_pipeline_snapshot
+    description: "Live per-closer deal-stage counts (#36-#51). Not date filtered."
+
+  - name: rpt_renewal_closer_dashboard
+    description: "Per-closer MTD / prior-MTD / goal reporting table feeding the dashboard."
+    columns:
+      - name: closer_owner_id
+        tests: [unique, not_null]

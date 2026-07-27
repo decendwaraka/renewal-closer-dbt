@@ -1,0 +1,47 @@
+version: 2
+
+seeds:
+  - name: dim_closers
+    description: "Renewal closer roster (HubSpot owner ids). Base filter for all closer attribution."
+    config:
+      column_types:
+        owner_id: varchar
+        closer_name: varchar
+    columns:
+      - name: owner_id
+        tests: [unique, not_null]
+
+  - name: dim_renewal_stages
+    description: "Deal stage reference for the HubSpot Pipeline Snapshot (both renewal pipelines)."
+    config:
+      column_types:
+        stage_id: varchar
+        pipeline_id: varchar
+        stage_label: varchar
+        stage_group: varchar
+        snapshot_col: varchar
+    columns:
+      - name: stage_id
+        tests: [unique, not_null]
+
+  - name: dim_targets
+    description: "Editable dashboard goals (placeholders until confirmed — OPEN_ISSUES #5)."
+    config:
+      column_types:
+        metric: varchar
+        target_value: number
+        unit: varchar
+    columns:
+      - name: metric
+        tests: [unique, not_null]
+
+  - name: dim_product_map
+    description: "STUB — maps live upsell_plan values to Cash-by-Pipeline columns. Pending RevOps (OPEN_ISSUES #2)."
+    config:
+      column_types:
+        upsell_plan: varchar
+        product_column: varchar
+        notes: varchar
+    columns:
+      - name: upsell_plan
+        tests: [unique, not_null]

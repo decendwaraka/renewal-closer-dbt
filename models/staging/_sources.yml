@@ -1,0 +1,19 @@
+version: 2
+
+sources:
+  - name: hubspot_raw
+    database: marketing_db
+    schema: raw
+    loaded_at_field: _FIVETRAN_SYNCED
+
+    freshness:
+      warn_after: {count: 4, period: hour}
+      error_after: {count: 8, period: hour}
+
+    tables:
+      - name: DEAL
+        description: "HubSpot deals (Fivetran-landed). Renewal cash, close date, stage, owner."
+      - name: ENGAGEMENT_MEETING
+        description: "Meeting engagements. Renewal PC/RC/PWC calls by hs_activity_type."
+      - name: OWNER
+        description: "Owner id -> name mapping."

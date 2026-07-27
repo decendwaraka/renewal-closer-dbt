@@ -1,0 +1,9 @@
+version: 2
+
+models:
+  - name: int_renewal__won_deals
+    description: "Closed-won renewal deals owned by a current closer, with ET close date and cash inputs."
+  - name: int_renewal__deal_cash
+    description: "Cash exploded to (deal, component) grain, each dated by its own field. base+AP1+AP2 today (OPEN_ISSUES #1)."
+  - name: int_renewal__meetings
+    description: "Renewal meetings categorized PC/RC/PWC with booked/completed flags, attributed to closers."

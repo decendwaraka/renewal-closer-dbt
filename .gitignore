@@ -1,0 +1,11 @@
+# Local development
+scripts/*
+ref_docs/*
+
+# dbt
+logs/*
+target/*
+
+git remote add origin https://github.com/decendwaraka/renewal-closer-dbt.git
+git branch -M main
+git push -u origin main

@@ -1,0 +1,5 @@
+metric,target_value,unit
+total_cash,350000,usd
+deals_won,30,count
+live_close_pct,30,percent
+avg_dpl,3500,usd

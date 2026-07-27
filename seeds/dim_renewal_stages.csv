@@ -1,0 +1,20 @@
+stage_id,pipeline_id,stage_label,stage_group,snapshot_col
+175326088,95211801,Midway Check In Due,progress_call,pc_due
+240516941,95211801,Midway Check In Invited,progress_call,pc_invited
+175346325,95211801,Midway Check In Scheduled,progress_call,pc_scheduled
+200475939,95211801,Midway Check in Not Complete,progress_call,pc_not_cmplt
+186330445,95211801,Midway Check in Complete - Nurture,progress_call,pc_completed
+203001161,95211801,Renewal Call Due,renewal_call,rc_due
+240516942,95211801,Renewal Call Invited,renewal_call,rc_invited
+186350393,95211801,Renewal Call Scheduled,renewal_call,rc_scheduled
+175346326,95211801,Renewal Call Not Complete,renewal_call,rc_not_cmplt
+200616252,95211801,Renewal Call Complete - Nurture,other,nurture
+1021424915,95211801,Follow Up Call Complete - Nurture,other,nurture
+175346329,95211801,Renewal Red Zone,other,redzone
+175346331,95211801,Renewal Closed Won - PIF,other,closed_won
+229787714,95211801,Renewal Closed Won - Payment Plan,other,closed_won
+175346332,95211801,Renewal Deal Lost,other,closed_lost
+209616300,95211801,Renewal Deal DNC,other,closed_lost
+1359829634,898243912,New Member,renewal_pipeline,new_member
+1359841795,898243912,Progress Call 1 Completed,renewal_pipeline,pc1_completed
+1359841456,898243912,Closed Won,other,closed_won

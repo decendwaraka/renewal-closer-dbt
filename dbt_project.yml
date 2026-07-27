@@ -1,0 +1,38 @@
+name: renewal_closer
+version: 1.0.0
+config-version: 2
+
+profile: renewal_setter
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  renewal_closer:
+    staging:
+      +schema: renewal_staging
+      +materialized: view
+    intermediate:
+      +schema: renewal_intermediate
+      +materialized: ephemeral
+    marts:
+      +schema: renewal_marts
+      +materialized: table
+
+seeds:
+  renewal_closer:
+    +schema: renewal_marts
+    +quote_columns: false
+
+vars:
+  # Closers (HubSpot owner ids). Kept in sync with seeds/dim_closers.csv.
+  closer_owner_ids: ['82672208', '756332149', '82734543', '756339074', '76930546']
+  # Renewal pipelines (base filter).
+  renewal_pipeline_ids: ['95211801', '898243912']
+  # Closed-won stages across both pipelines (base filter).
+  won_stage_ids: ['175346331', '229787714', '1359841456']
