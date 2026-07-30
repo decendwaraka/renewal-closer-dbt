@@ -9,8 +9,8 @@
 
 {% set cash_components = [
     ('base', 'cash_collected', 'close_date_et'),
-    ('ap1',  'ap1_amount',     to_et_date('ap1_stamped_at')),
-    ('ap2',  'ap2_amount',     to_et_date('ap2_stamped_at')),
+    ('ap1',  'ap1_amount',     hubspot_date_to_et_date('ap1_stamped_at')),
+    ('ap2',  'ap2_amount',     hubspot_date_to_et_date('ap2_stamped_at')),
 ] %}
 
 WITH won AS (

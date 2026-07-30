@@ -1,3 +1,5 @@
+{{ config(materialized='view') }}
+
 -- Payment-grain cash fact. One row per (deal, cash component), dated in ET, with product/term
 -- attributes for the Cash-by-Pipeline split. Sum cash_amount at query time for any window.
 

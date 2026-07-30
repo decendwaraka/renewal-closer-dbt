@@ -15,7 +15,7 @@ won AS (
         d.closer_owner_id,
         d.pipeline_id,
         d.dealstage_id,
-        {{ to_et_date('d.close_date') }}  AS close_date_et,
+        {{ hubspot_date_to_et_date('d.close_date') }}  AS close_date_et,
         d.cash_collected,
         d.ap1_amount,
         d.ap1_stamped_at,
