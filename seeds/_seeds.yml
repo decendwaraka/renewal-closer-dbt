@@ -36,7 +36,7 @@ seeds:
         tests: [unique, not_null]
 
   - name: dim_product_map
-    description: "STUB — maps live upsell_plan values to Cash-by-Pipeline columns. Pending RevOps (OPEN_ISSUES #2)."
+    description: "Maps upsell_plan values to product tier columns (ACC_T1/MM_T1/TERM_2) per Celeste/RevOps 2026-08-08 (OPEN_ISSUES #2)."
     config:
       column_types:
         upsell_plan: varchar

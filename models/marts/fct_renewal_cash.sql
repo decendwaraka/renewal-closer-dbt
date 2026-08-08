@@ -1,3 +1,5 @@
+{{ config(materialized='view') }}
+
 -- Payment-grain cash fact. One row per (deal, cash component), dated in ET, with product/term
 -- attributes for the Cash-by-Pipeline split. Sum cash_amount at query time for any window.
 
@@ -34,7 +36,9 @@ final AS (
         d.renewal_year_count,
         d.orig_product_category,
         d.upsell_plan,
-        -- OPEN ISSUE #2: product_column is UNMAPPED until RevOps confirms the upsell_plan mapping.
+        -- OPEN ISSUE #2 resolved 2026-08-08: seeds/dim_product_map.csv maps upsell_plan to
+        -- ACC_TIER/MM_TIER/TERM_2 per Celeste/RevOps. UNMAPPED fallback stays as a safety net for any
+        -- future upsell_plan value added in HubSpot before the seed is updated to match.
         COALESCE(pm.product_column, 'UNMAPPED') AS product_column
     FROM cash AS c
     LEFT JOIN deals AS d ON c.deal_id = d.deal_id

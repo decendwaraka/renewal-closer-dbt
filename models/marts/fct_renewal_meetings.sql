@@ -1,3 +1,5 @@
+{{ config(materialized='view') }}
+
 -- Meeting-grain fact for Call Outcomes (#10-#21), Today (#5,#6), Booking/Show (#52-#57).
 -- One row per renewal meeting with category (PC/RC/PWC) and booked/completed flags.
 
