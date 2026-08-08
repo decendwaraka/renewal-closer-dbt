@@ -1,7 +1,7 @@
 {# Meeting outcome flags.
-   Spec claimed the renewal team uses plain outcomes only, but Snowflake data shows sub-outcomes DO occur
-   (COMPLETED - NURTURE, COMPLETED - QUALIFIED) — see OPEN_ISSUES #7. A "COMPLETED - *" call did complete,
-   so Completed/Show counts use LIKE 'COMPLETED%' (matches setter-dbt outcome_bucket), NOT exact equality.
+   Sub-outcomes DO occur in the data (COMPLETED - NURTURE, COMPLETED - QUALIFIED) even though the spec
+   says the renewal team only uses plain outcomes — see OPEN_ISSUES Resolved (#7, 2026-08-06). Decision:
+   follow the spec literally — Completed/Show uses exact `= 'COMPLETED'`, excluding sub-outcomes.
    Booked = not canceled (NULL outcomes excluded, per strict spec NOT IN ('CANCELED') semantics). #}
 
 {% macro is_meeting_booked(outcome_col) %}
@@ -9,5 +9,5 @@
 {% endmacro %}
 
 {% macro is_meeting_completed(outcome_col) %}
-    ({{ outcome_col }} LIKE 'COMPLETED%')
+    ({{ outcome_col }} = 'COMPLETED')
 {% endmacro %}

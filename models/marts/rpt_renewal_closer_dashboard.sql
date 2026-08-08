@@ -1,3 +1,5 @@
+{{ config(materialized='view') }}
+
 -- Wide per-closer reporting table for the dashboard leaderboards (#1-#4), Today snapshot (#5-#9),
 -- and vs-prior-month (#35). MTD vs same-elapsed-days prior month, plus goal columns from dim_targets.
 -- Goals are TEAM totals; the dashboard sums closer rows for team progress. One row per closer.

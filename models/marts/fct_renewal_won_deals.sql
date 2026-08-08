@@ -1,3 +1,5 @@
+{{ config(materialized='view') }}
+
 -- Deal-grain won-deals fact. One row per closed-won renewal deal, dated by ET close date.
 -- Powers windowed deal counts: Deals Won (#2), Deals Closed Today (#7), # Closed (#33),
 -- and the close-rate numerators (#15, #21, #34, #57). Count deal_id over any [start, end]
