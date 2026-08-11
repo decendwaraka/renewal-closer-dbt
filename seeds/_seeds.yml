@@ -24,17 +24,6 @@ seeds:
       - name: stage_id
         tests: [unique, not_null]
 
-  - name: dim_targets
-    description: "Editable dashboard goals (placeholders until confirmed — OPEN_ISSUES #5)."
-    config:
-      column_types:
-        metric: varchar
-        target_value: number
-        unit: varchar
-    columns:
-      - name: metric
-        tests: [unique, not_null]
-
   - name: dim_product_map
     description: "Maps upsell_plan values to product tier columns (ACC_T1/MM_T1/TERM_2) per Celeste/RevOps 2026-08-08 (OPEN_ISSUES #2)."
     config:

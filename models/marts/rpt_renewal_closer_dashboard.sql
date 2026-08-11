@@ -1,12 +1,14 @@
 {{ config(materialized='view') }}
 
 -- Wide per-closer reporting table for the dashboard leaderboards (#1-#4), Today snapshot (#5-#9),
--- and vs-prior-month (#35). MTD vs same-elapsed-days prior month, plus goal columns from dim_targets.
--- Goals are TEAM totals; the dashboard sums closer rows for team progress. One row per closer.
+-- and vs-prior-month (#35). MTD vs same-elapsed-days prior month, plus per-closer goal columns
+-- from the live-editable DIM_RENEWAL_TARGETS table (admin-writable, not a dbt seed — see
+-- models/marts/_sources.yml). Team totals are the dashboard's sum of closer rows. One row per closer.
 --
 -- OPEN ISSUE #1: cash columns reflect base+AP1+AP2 only (warehouse sync gap).
 -- OPEN ISSUE #4: day-bucketing standardized to ET via to_et_date to match HubSpot MTD boundaries.
--- OPEN ISSUE #5: goal values in dim_targets are placeholders.
+-- OPEN ISSUE #6: resolved 2026-08-11 — real per-closer goals wired in, admin-editable via the
+-- dashboard's Edit Targets UI, persisted to DIM_RENEWAL_TARGETS.
 
 WITH anchors AS (
     SELECT DATE(CONVERT_TIMEZONE('America/New_York', CURRENT_TIMESTAMP())) AS today_et
@@ -61,11 +63,12 @@ meetings_agg AS (
 
 targets AS (
     SELECT
-        MAX(CASE WHEN metric = 'total_cash' THEN target_value END)      AS goal_total_cash,
-        MAX(CASE WHEN metric = 'deals_won' THEN target_value END)       AS goal_deals_won,
-        MAX(CASE WHEN metric = 'live_close_pct' THEN target_value END)  AS goal_live_close_pct,
-        MAX(CASE WHEN metric = 'avg_dpl' THEN target_value END)         AS goal_avg_dpl
-    FROM {{ ref('dim_targets') }}
+        closer_name,
+        goal_total_cash,
+        goal_deals_won,
+        goal_live_close_pct,
+        goal_avg_dpl
+    FROM {{ source('renewal_marts_live', 'DIM_RENEWAL_TARGETS') }}
 ),
 
 final AS (
@@ -101,7 +104,7 @@ final AS (
     LEFT JOIN cash_agg AS ca ON cl.owner_id = ca.closer_owner_id
     LEFT JOIN deals_agg AS da ON cl.owner_id = da.closer_owner_id
     LEFT JOIN meetings_agg AS ma ON cl.owner_id = ma.closer_owner_id
-    CROSS JOIN targets AS t
+    LEFT JOIN targets AS t ON cl.closer_name = t.closer_name
     CROSS JOIN bounds AS b
 )
 
