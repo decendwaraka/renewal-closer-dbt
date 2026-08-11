@@ -1,0 +1,10 @@
+version: 2
+
+sources:
+  - name: renewal_marts_live
+    database: PRODUCTION
+    schema: RENEWAL_MARTS
+    description: "Tables in this schema written directly by the dashboard frontend, not by dbt."
+    tables:
+      - name: DIM_RENEWAL_TARGETS
+        description: "Admin-editable per-closer dashboard goals, written by the Edit Targets UI. Not a dbt model/seed — dbt only reads it (OPEN_ISSUES #6)."
