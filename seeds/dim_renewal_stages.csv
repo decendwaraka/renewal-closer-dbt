@@ -18,3 +18,11 @@ stage_id,pipeline_id,stage_label,stage_group,snapshot_col
 1359829634,898243912,New Member,renewal_pipeline,new_member
 1359841795,898243912,Progress Call 1 Completed,renewal_pipeline,pc1_completed
 1359841456,898243912,Closed Won,other,closed_won
+1401758771,917643668,Winback Eligible,winback,wb_eligible
+1401758772,917643668,Winback Attempting Contact,winback,wb_attempting
+1401758773,917643668,Winback Booked,winback,wb_booked
+1408600080,917643668,Winback Not Complete,winback,wb_not_complete
+1401758774,917643668,Winback Nurture,winback,wb_nurture
+1401758775,917643668,Winback Red Zone,winback,wb_redzone
+1401758776,917643668,Winback Closed Won,winback,wb_closed_won
+1401758777,917643668,Winback Closed Lost,winback,wb_closed_lost
