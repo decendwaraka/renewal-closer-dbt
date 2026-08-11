@@ -12,7 +12,7 @@ seeds:
         tests: [unique, not_null]
 
   - name: dim_renewal_stages
-    description: "Deal stage reference for the HubSpot Pipeline Snapshot (both renewal pipelines)."
+    description: "Deal stage reference for the HubSpot Pipeline Snapshot (both renewal pipelines and the Winbacks Pipeline)."
     config:
       column_types:
         stage_id: varchar

@@ -7,3 +7,33 @@ models:
     description: "Cash exploded to (deal, component) grain, each dated by its own field. base+AP1+AP2 today (OPEN_ISSUES #1)."
   - name: int_renewal__meetings
     description: "Renewal meetings categorized PC/RC/PWC with booked/completed flags, attributed to closers."
+
+unit_tests:
+  - name: test_won_deals_excludes_winback_pipeline
+    description: "A deal sitting in the Winbacks Pipeline must never be counted as a renewal closed-won deal, even on a closed-won-labeled stage -- the pipeline_id filter (not just dealstage_id) is what keeps Win-Back cash out of renewal cash/won-deal totals (deliberate v1 scope decision)."
+    model: int_renewal__won_deals
+    given:
+      - input: ref('stg_renewal__deals')
+        rows:
+          - {deal_id: 1, closer_owner_id: '82672208', pipeline_id: '917643668', dealstage_id: '1401758776', close_date: "2026-08-01", cash_collected: 12000}
+          - {deal_id: 2, closer_owner_id: '82672208', pipeline_id: '95211801', dealstage_id: '175346331', close_date: "2026-08-01", cash_collected: 5000}
+      - input: ref('dim_closers')
+        rows:
+          - {owner_id: '82672208', closer_name: 'Sufijan Cunningham'}
+    expect:
+      rows:
+        - {deal_id: 2, closer_owner_id: '82672208', pipeline_id: '95211801', dealstage_id: '175346331', close_date_et: "2026-08-01", cash_collected: 5000}
+
+  - name: test_won_deals_excludes_non_won_stage_and_non_closer
+    description: "A renewal-pipeline deal not on a won stage, and a deal owned outside dim_closers, are both excluded."
+    model: int_renewal__won_deals
+    given:
+      - input: ref('stg_renewal__deals')
+        rows:
+          - {deal_id: 1, closer_owner_id: '82672208', pipeline_id: '95211801', dealstage_id: '175346325', close_date: "2026-08-01", cash_collected: 5000}
+          - {deal_id: 2, closer_owner_id: '999999999', pipeline_id: '95211801', dealstage_id: '175346331', close_date: "2026-08-01", cash_collected: 5000}
+      - input: ref('dim_closers')
+        rows:
+          - {owner_id: '82672208', closer_name: 'Sufijan Cunningham'}
+    expect:
+      rows: []
