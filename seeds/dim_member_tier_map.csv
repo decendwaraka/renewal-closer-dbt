@@ -1,0 +1,14 @@
+active_product_snapshot_at_won,tier_of_origin_column,notes
+Mastermind Pro,MM_TIER,Tier-of-origin per Celeste 2026-08-12 - what they were on before this renewal
+Mastermind Premium,MM_TIER,Tier-of-origin per Celeste 2026-08-12
+Upgrade - Mastermind Pro,MM_TIER,Tier-of-origin per Celeste 2026-08-12
+Restart - Mastermind Pro,MM_TIER,Tier-of-origin per Celeste 2026-08-12
+Mastermin Pro,MM_TIER,Typo variant of 'Mastermind Pro' found live in HubSpot (1 deal) - flagged to Celeste 2026-08-12 to confirm; mapped as MM_TIER in the meantime
+Accelerator Gems,ACC_TIER,Tier-of-origin per Celeste 2026-08-12
+Accelerator Plus,ACC_TIER,Tier-of-origin per Celeste 2026-08-12
+Accelerator DIY,ACC_TIER,Tier-of-origin per Celeste 2026-08-12
+Defi Accelerator Gems,ACC_TIER,Provisional - flagged to Celeste 2026-08-12 to confirm DeFi belongs under ACC_TIER vs its own tier (33 deals total across both Defi values)
+DeFi Accelerator Plus,ACC_TIER,Provisional - flagged to Celeste 2026-08-12 to confirm DeFi belongs under ACC_TIER vs its own tier (33 deals total across both Defi values)
+Bronze,TERM_2,Tier-of-origin per Celeste 2026-08-12
+Gold,TERM_2,Tier-of-origin per Celeste 2026-08-12
+Platinum,TERM_2,Tier-of-origin per Celeste 2026-08-12

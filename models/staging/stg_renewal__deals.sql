@@ -34,7 +34,11 @@ renamed AS (
         property_renewal_year_count                                 AS renewal_year_count,
         property_renewal_product_category_originally_purchased      AS orig_product_category,
         property_upsell_plan                                        AS upsell_plan,
-        property_renewal_product_pitched                            AS renewal_product_pitched
+        property_renewal_product_pitched                            AS renewal_product_pitched,
+
+        -- tier-of-origin (OPEN_ISSUES #8): snapshot of the member's Active Product the day before Closed
+        -- Won, distinct from upsell_plan (what they're renewing into). Auto-filled via HubSpot workflow.
+        property_active_product_snapshot_at_won                     AS active_product_snapshot_at_won
     FROM source
 )
 

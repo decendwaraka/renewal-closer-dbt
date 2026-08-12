@@ -34,3 +34,14 @@ seeds:
     columns:
       - name: upsell_plan
         tests: [unique, not_null]
+
+  - name: dim_member_tier_map
+    description: "Maps active_product_snapshot_at_won values to tier-of-origin columns (ACC_TIER/MM_TIER/TERM_2) per Celeste 2026-08-12 (OPEN_ISSUES #8) -- separate from dim_product_map, which stays on upsell_plan for the product-mix split. Join is case-insensitive in int_renewal__won_deals.sql since live data has inconsistent casing (e.g. 'Defi'/'DeFi')."
+    config:
+      column_types:
+        active_product_snapshot_at_won: varchar
+        tier_of_origin_column: varchar
+        notes: varchar
+    columns:
+      - name: active_product_snapshot_at_won
+        tests: [unique, not_null]
