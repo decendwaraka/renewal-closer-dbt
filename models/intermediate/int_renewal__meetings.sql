@@ -1,4 +1,5 @@
--- Renewal meetings categorized into PC / RC / PWC (spec Meeting Type Reference), attributed to closers.
+-- Renewal meetings categorized into PC / RC / PWC / WB (spec Meeting Type Reference + OPEN_ISSUES #12),
+-- attributed to closers.
 -- Booked = outcome not canceled; Completed/Show = exactly COMPLETED (renewal team uses plain outcomes).
 
 WITH meetings AS (
@@ -25,6 +26,8 @@ categorized AS (
             ) THEN 'RC'
             WHEN m.activity_type = 'Renewal Post Webinar Call'
                 THEN 'PWC'
+            WHEN m.activity_type = 'Renewal Winback Call'
+                THEN 'WB'
             ELSE NULL
         END                                     AS meeting_category,
         {{ is_meeting_booked('m.meeting_outcome') }}     AS is_booked,

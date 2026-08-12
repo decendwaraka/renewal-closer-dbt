@@ -6,14 +6,14 @@ models:
     # cash_amount non-negativity enforced by tests/assert_cash_nonnegative.sql (no dbt_utils dependency)
 
   - name: fct_renewal_meetings
-    description: "Meeting-grain fact: PC/RC/PWC category + booked/completed flags."
+    description: "Meeting-grain fact: PC/RC/PWC/WB category + booked/completed flags."
     columns:
       - name: meeting_id
         tests: [unique, not_null]
       - name: meeting_category
         tests:
           - accepted_values:
-              values: ['PC', 'RC', 'PWC']
+              values: ['PC', 'RC', 'PWC', 'WB']
       - name: meeting_outcome
         tests:
           - accepted_values:

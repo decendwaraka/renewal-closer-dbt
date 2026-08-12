@@ -54,8 +54,8 @@ deals_agg AS (
 meetings_agg AS (
     SELECT
         m.closer_owner_id,
-        COUNT_IF(m.meeting_category IN ('RC', 'PWC') AND m.is_completed AND m.meeting_date_et BETWEEN b.mtd_start AND b.mtd_end)               AS live_meetings_mtd,
-        COUNT_IF(m.meeting_category IN ('RC', 'PWC') AND m.is_completed AND m.meeting_date_et BETWEEN b.prior_month_start AND b.prior_mtd_end) AS live_meetings_prior_mtd
+        COUNT_IF(m.meeting_category IN ('RC', 'PWC', 'WB') AND m.is_completed AND m.meeting_date_et BETWEEN b.mtd_start AND b.mtd_end)               AS live_meetings_mtd,
+        COUNT_IF(m.meeting_category IN ('RC', 'PWC', 'WB') AND m.is_completed AND m.meeting_date_et BETWEEN b.prior_month_start AND b.prior_mtd_end) AS live_meetings_prior_mtd
     FROM {{ ref('fct_renewal_meetings') }} AS m
     CROSS JOIN bounds AS b
     GROUP BY 1
