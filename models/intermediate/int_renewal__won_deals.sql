@@ -1,5 +1,7 @@
 -- Closed-won renewal deals attributed to a current closer.
 -- Base filters (spec): renewal pipelines + won stages + closer owner + close date field.
+-- Also includes Win-Back pipeline deals on its own closed-won stage (OPEN_ISSUES #12) -- Win-Back
+-- was previously excluded entirely (deliberate v1 scope decision), now folded into cash/won-deal totals.
 
 WITH deals AS (
     SELECT * FROM {{ ref('stg_renewal__deals') }}
@@ -31,8 +33,13 @@ won AS (
         d.renewal_product_pitched
     FROM deals AS d
     INNER JOIN closers AS c ON d.closer_owner_id = c.owner_id
-    WHERE d.pipeline_id IN ({{ "'" ~ var('renewal_pipeline_ids') | join("','") ~ "'" }})
-      AND d.dealstage_id IN ({{ "'" ~ var('won_stage_ids') | join("','") ~ "'" }})
+    WHERE (
+        d.pipeline_id IN ({{ "'" ~ var('renewal_pipeline_ids') | join("','") ~ "'" }})
+        AND d.dealstage_id IN ({{ "'" ~ var('won_stage_ids') | join("','") ~ "'" }})
+    ) OR (
+        d.pipeline_id = '{{ var('winback_pipeline_id') }}'
+        AND d.dealstage_id IN ({{ "'" ~ var('winback_won_stage_ids') | join("','") ~ "'" }})
+    )
 )
 
 SELECT * FROM won

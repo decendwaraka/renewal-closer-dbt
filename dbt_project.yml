@@ -36,7 +36,8 @@ vars:
   renewal_pipeline_ids: ['95211801', '898243912']
   # Closed-won stages across both pipelines (base filter).
   won_stage_ids: ['175346331', '229787714', '1359841456']
-  # Winbacks Pipeline (Deal Lost -> re-approached later). Not included in renewal_pipeline_ids/won_stage_ids
-  # above -- Win-Back is tracked separately via dim_renewal_stages' stage_group='winback' rows, not filtered
-  # into the renewal cash/won-deal models.
+  # Winbacks Pipeline (Deal Lost -> re-approached later). Folded into renewal cash/won-deal totals via
+  # int_renewal__won_deals.sql (OPEN_ISSUES #12) using this id plus winback_won_stage_ids below.
   winback_pipeline_id: '917643668'
+  # Win-Back's closed-won stage (Winback Closed Won, dim_renewal_stages stage_id 1401758776).
+  winback_won_stage_ids: ['1401758776']
