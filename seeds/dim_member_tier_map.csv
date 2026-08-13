@@ -1,0 +1,14 @@
+active_product_snapshot_at_won,tier_of_origin_column,notes
+Mastermind Pro,MM_TIER,Tier-of-origin per Celeste 2026-08-12 - what they were on before this renewal
+Mastermind Premium,MM_TIER,Tier-of-origin per Celeste 2026-08-12
+Upgrade - Mastermind Pro,MM_TIER,Tier-of-origin per Celeste 2026-08-12
+Restart - Mastermind Pro,MM_TIER,Tier-of-origin per Celeste 2026-08-12
+Mastermin Pro,MM_TIER,Typo variant of 'Mastermind Pro' - Celeste fixed the source deal directly in HubSpot 2026-08-12; kept as a defensive fallback in case Fivetran hasn't re-synced yet or the same typo recurs elsewhere
+Accelerator Gems,ACC_TIER,Tier-of-origin per Celeste 2026-08-12
+Accelerator Plus,ACC_TIER,Tier-of-origin per Celeste 2026-08-12
+Accelerator DIY,ACC_TIER,Tier-of-origin per Celeste 2026-08-12
+Defi Accelerator Gems,ACC_TIER,Confirmed ACC_TIER by Celeste 2026-08-12 (33 deals total across both Defi values)
+DeFi Accelerator Plus,ACC_TIER,Confirmed ACC_TIER by Celeste 2026-08-12 (33 deals total across both Defi values)
+Bronze,TERM_2,Tier-of-origin per Celeste 2026-08-12
+Gold,TERM_2,Tier-of-origin per Celeste 2026-08-12
+Platinum,TERM_2,Tier-of-origin per Celeste 2026-08-12

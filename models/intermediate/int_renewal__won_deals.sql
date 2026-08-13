@@ -30,7 +30,8 @@ won AS (
         d.renewal_year_count,
         d.orig_product_category,
         d.upsell_plan,
-        d.renewal_product_pitched
+        d.renewal_product_pitched,
+        d.active_product_snapshot_at_won
     FROM deals AS d
     INNER JOIN closers AS c ON d.closer_owner_id = c.owner_id
     WHERE (
