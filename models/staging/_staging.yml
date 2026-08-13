@@ -12,3 +12,9 @@ models:
     columns:
       - name: meeting_id
         tests: [unique, not_null]
+
+  - name: stg_renewal__meeting_deals
+    description: "One row per meeting engagement with its associated deal_id (deduped to one deal per meeting), for first-call-per-deal dedup (OPEN_ISSUES #23)."
+    columns:
+      - name: meeting_id
+        tests: [unique, not_null]

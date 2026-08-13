@@ -15,5 +15,7 @@ sources:
         description: "HubSpot deals (Fivetran-landed). Renewal cash, close date, stage, owner."
       - name: ENGAGEMENT_MEETING
         description: "Meeting engagements. Renewal PC/RC/PWC calls by hs_activity_type."
+      - name: ENGAGEMENT_DEAL
+        description: "Meeting-to-deal association (engagement_id -> deal_id). Used for first-call dedup (OPEN_ISSUES #23)."
       - name: OWNER
         description: "Owner id -> name mapping."
