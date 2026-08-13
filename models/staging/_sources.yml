@@ -19,3 +19,7 @@ sources:
         description: "Meeting-to-deal association (engagement_id -> deal_id). Used for first-call dedup (OPEN_ISSUES #23)."
       - name: OWNER
         description: "Owner id -> name mapping."
+      - name: DEAL_CONTACT
+        description: "Deal-to-contact association (Fivetran). Used for test-contact exclusion (Sub-task 3, 2026-08-13) -- almost every deal has exactly one associated contact, a handful have two."
+      - name: CONTACT
+        description: "HubSpot contacts. hs_lead_status used to identify and exclude Internal Test contacts' deals from pipeline totals."

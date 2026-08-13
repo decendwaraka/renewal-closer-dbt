@@ -47,7 +47,14 @@ final AS (
         -- OPEN ISSUE #2 resolved 2026-08-08: seeds/dim_product_map.csv maps upsell_plan to
         -- ACC_TIER/MM_TIER/TERM_2 per Celeste/RevOps. UNMAPPED fallback stays as a safety net for any
         -- future upsell_plan value added in HubSpot before the seed is updated to match.
-        COALESCE(pm.product_column, 'UNMAPPED') AS product_column,
+        -- Win-Back override (2026-08-13, two independent stakeholder reports): Win-Back deals must
+        -- never land in the ACC_TIER/MM_TIER/TERM_2 buckets -- they get their own "Winback Cash" line
+        -- item downstream. dim_product_map.csv still has legacy Winback-flavored upsell_plan rows
+        -- mapped into those tiers, but this pipeline_id check takes precedence and short-circuits them.
+        CASE
+            WHEN d.pipeline_id = '{{ var('winback_pipeline_id') }}' THEN 'WINBACK'
+            ELSE COALESCE(pm.product_column, 'UNMAPPED')
+        END AS product_column,
         d.active_product_snapshot_at_won,
         -- OPEN ISSUE #8 resolved 2026-08-12: seeds/dim_member_tier_map.csv maps
         -- active_product_snapshot_at_won to ACC_TIER/MM_TIER/TERM_2. Case-insensitive join -- live

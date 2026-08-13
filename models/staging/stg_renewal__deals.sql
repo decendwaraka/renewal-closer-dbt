@@ -38,7 +38,23 @@ renamed AS (
 
         -- tier-of-origin (OPEN_ISSUES #8): snapshot of the member's Active Product the day before Closed
         -- Won, distinct from upsell_plan (what they're renewing into). Auto-filled via HubSpot workflow.
-        property_active_product_snapshot_at_won                     AS active_product_snapshot_at_won
+        property_active_product_snapshot_at_won                     AS active_product_snapshot_at_won,
+
+        -- Stage-entry timestamps (PC/RC Book% cohort formula): HubSpot auto-stamps a per-stage
+        -- "date entered" property, keyed by stage_id, onto the deal. Coalesced across the old pipeline
+        -- (95211801) and new Renewal Pipeline (898243912) -- confirmed live via
+        -- MARKETING_DB.INFORMATION_SCHEMA.COLUMNS that all 8 underlying columns exist. These are real
+        -- timestamps (not midnight-anchored date properties), so downstream conversion uses to_et_date,
+        -- not hubspot_date_to_et_date.
+        COALESCE(property_hs_v_2_date_entered_240516941, property_hs_v_2_date_entered_1359841792)  AS date_entered_pc_invited,
+        COALESCE(property_hs_v_2_date_entered_175346325, property_hs_v_2_date_entered_1359841793)  AS date_entered_pc_scheduled,
+        COALESCE(property_hs_v_2_date_entered_240516942, property_hs_v_2_date_entered_1359841800)  AS date_entered_rc_invited,
+        COALESCE(property_hs_v_2_date_entered_186350393, property_hs_v_2_date_entered_1359841801)  AS date_entered_rc_scheduled,
+
+        -- Membership Expiration Date (RC Due date-based logic). Midnight-anchored HubSpot date property
+        -- (confirmed live: always 00:00:00+00 time-of-day), so it's a hubspot_date_to_et_date candidate,
+        -- not a real timestamp -- staged raw here, converted downstream where used.
+        property_membership_expiration_date                         AS membership_expiration_date
     FROM source
 )
 

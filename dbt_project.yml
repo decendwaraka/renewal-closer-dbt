@@ -34,6 +34,10 @@ vars:
   closer_owner_ids: ['82672208', '756332149', '82734543', '756339074', '76930546']
   # Renewal pipelines (base filter).
   renewal_pipeline_ids: ['95211801', '898243912']
+  # New Renewal Pipeline (post-migration). Has no Due-equivalent stage at all, so rc_due is computed from
+  # Membership Expiration Date for this pipeline only (fct_renewal_pipeline_snapshot.sql, 2026-08-13);
+  # the old pipeline keeps its existing stage-based rc_due unchanged.
+  new_renewal_pipeline_id: '898243912'
   # Closed-won stages across both pipelines (base filter).
   won_stage_ids: ['175346331', '229787714', '1359841456']
   # Winbacks Pipeline (Deal Lost -> re-approached later). Folded into renewal cash/won-deal totals via
