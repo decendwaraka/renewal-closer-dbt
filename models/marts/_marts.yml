@@ -15,7 +15,8 @@ models:
           - accepted_values:
               values: ['PC', 'RC', 'PWC', 'WB']
       - name: is_first_call
-        description: "First completed call per (deal_id, meeting_category) -- OPEN_ISSUES #23. DPL/Close Rate should filter on this; Call Outcomes counts intentionally don't."
+        description: "First completed call per (deal_id, meeting_category) -- OPEN_ISSUES #23. DPL/Close Rate should filter on this; Call Outcomes counts intentionally don't. ALWAYS read it as `is_completed AND is_first_call`: non-completed calls are never ranked and fall through to TRUE, so on its own the flag makes a canceled call look like an un-deduped follow-up."
+        # one-first-call-per-(deal, category) enforced by tests/assert_first_call_dedup.sql
       - name: meeting_outcome
         tests:
           - accepted_values:
