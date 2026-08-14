@@ -1,0 +1,16 @@
+# CI-only dbt profile. Contains NO secrets — every value is injected via env vars
+# (the workflow writes the Snowflake key to a file from a GitHub secret at runtime).
+# Local dev keeps using ~/.dbt/profiles.yml; CI points DBT_PROFILES_DIR at this folder.
+renewal_setter:
+  target: prod
+  outputs:
+    prod:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      private_key_path: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_PATH') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE', 'PRODUCTION') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE', 'COMPUTE_WH') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE', 'DBT_MARKETING_ROLE') }}"
+      schema: renewal_marts   # overridden per-layer by generate_schema_name (verbatim +schema)
+      threads: 8

@@ -1,0 +1,51 @@
+name: dbt run (prod)
+
+# Refreshes PRODUCTION.RENEWAL_* every 2 hours. Cron is UTC.
+# Also runnable on demand from the Actions tab.
+on:
+  schedule:
+    - cron: "0 */2 * * *"
+  workflow_dispatch:
+
+# Never let two prod runs overlap; let a running run finish rather than cancel it.
+concurrency:
+  group: dbt-prod
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DBT_PROFILES_DIR: ${{ github.workspace }}/ci
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+      SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+      SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+      SNOWFLAKE_PRIVATE_KEY_PATH: ${{ github.workspace }}/rsa_key.p8
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dbt
+        run: pip install "dbt-core==1.11.8" "dbt-snowflake==1.11.4"
+
+      - name: Write Snowflake private key
+        env:
+          SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+        run: |
+          umask 077
+          printf '%s\n' "$SNOWFLAKE_PRIVATE_KEY" > "$SNOWFLAKE_PRIVATE_KEY_PATH"
+
+      - name: dbt deps
+        run: dbt deps
+
+      - name: dbt debug (connection check)
+        run: dbt debug --target prod
+
+      - name: dbt run (prod)
+        run: dbt run --target prod
