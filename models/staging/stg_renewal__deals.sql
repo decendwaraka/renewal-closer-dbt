@@ -41,15 +41,23 @@ renamed AS (
         property_active_product_snapshot_at_won                     AS active_product_snapshot_at_won,
 
         -- Stage-entry timestamps (PC/RC Book% cohort formula): HubSpot auto-stamps a per-stage
-        -- "date entered" property, keyed by stage_id, onto the deal. Coalesced across the old pipeline
-        -- (95211801) and new Renewal Pipeline (898243912) -- confirmed live via
-        -- MARKETING_DB.INFORMATION_SCHEMA.COLUMNS that all 8 underlying columns exist. These are real
+        -- "date entered" property, keyed by stage_id, onto the deal. Picked by the deal's CURRENT
+        -- pipeline (95211801 old / 898243912 new), not COALESCE(old, new) -- COALESCE silently prefers
+        -- the old pipeline's property whenever it's non-null, which is true for every migrated deal
+        -- (HubSpot never clears the old stage-entry timestamp after migration). That meant a migrated
+        -- deal's real, current-window new-pipeline stage entry was masked by a stale months-old date
+        -- and dropped from the Book% cohort entirely -- confirmed live 2026-08-14, e.g. one closer's
+        -- PC-Invited cohort undercounted ~6 vs. an actual ~55 for the same window. These are real
         -- timestamps (not midnight-anchored date properties), so downstream conversion uses to_et_date,
         -- not hubspot_date_to_et_date.
-        COALESCE(property_hs_v_2_date_entered_240516941, property_hs_v_2_date_entered_1359841792)  AS date_entered_pc_invited,
-        COALESCE(property_hs_v_2_date_entered_175346325, property_hs_v_2_date_entered_1359841793)  AS date_entered_pc_scheduled,
-        COALESCE(property_hs_v_2_date_entered_240516942, property_hs_v_2_date_entered_1359841800)  AS date_entered_rc_invited,
-        COALESCE(property_hs_v_2_date_entered_186350393, property_hs_v_2_date_entered_1359841801)  AS date_entered_rc_scheduled,
+        CASE WHEN deal_pipeline_id::VARCHAR = '{{ var("new_renewal_pipeline_id") }}'
+             THEN property_hs_v_2_date_entered_1359841792 ELSE property_hs_v_2_date_entered_240516941 END AS date_entered_pc_invited,
+        CASE WHEN deal_pipeline_id::VARCHAR = '{{ var("new_renewal_pipeline_id") }}'
+             THEN property_hs_v_2_date_entered_1359841793 ELSE property_hs_v_2_date_entered_175346325 END AS date_entered_pc_scheduled,
+        CASE WHEN deal_pipeline_id::VARCHAR = '{{ var("new_renewal_pipeline_id") }}'
+             THEN property_hs_v_2_date_entered_1359841800 ELSE property_hs_v_2_date_entered_240516942 END AS date_entered_rc_invited,
+        CASE WHEN deal_pipeline_id::VARCHAR = '{{ var("new_renewal_pipeline_id") }}'
+             THEN property_hs_v_2_date_entered_1359841801 ELSE property_hs_v_2_date_entered_186350393 END AS date_entered_rc_scheduled,
 
         -- Generic "date entered whatever stage the deal is CURRENTLY in" (HubSpot system property,
         -- confirmed live 100% populated across all 3 pipelines incl. Win-Back, which has no per-stage
