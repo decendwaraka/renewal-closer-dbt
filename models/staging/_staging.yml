@@ -18,3 +18,9 @@ models:
     columns:
       - name: meeting_id
         tests: [unique, not_null]
+
+  - name: stg_renewal__deal_contacts
+    description: "One row per deal with an associated contact, flagging deals linked to an Internal Test contact for exclusion from pipeline totals (Sub-task 3, 2026-08-13)."
+    columns:
+      - name: deal_id
+        tests: [unique, not_null]

@@ -22,7 +22,8 @@ final AS (
         m.deal_id,
         m.is_booked,
         m.is_completed,
-        m.is_first_call
+        m.is_first_call,
+        m.is_closing_call
     FROM meetings AS m
     LEFT JOIN {{ ref('dim_closers') }} AS cl ON m.closer_owner_id = cl.owner_id
 )

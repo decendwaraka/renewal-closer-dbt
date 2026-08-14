@@ -27,8 +27,7 @@ categorized AS (
             WHEN m.activity_type IN ('Renewal 3 Month', 'Renewal Accelerator 3 month')
                 THEN 'PC'
             WHEN m.activity_type IN (
-                'Renewal Strategy', 'Renewal Strategy Alignment', 'Renewal Accelerator',
-                'Renewal Accelerator Evergreen', 'Renewal Follow-up'
+                'Renewal Strategy', 'Renewal Accelerator', 'Renewal Follow-up'
             ) THEN 'RC'
             WHEN m.activity_type = 'Renewal Post Webinar Call'
                 THEN 'PWC'
@@ -74,6 +73,11 @@ SELECT
     f.deal_id,
     f.is_booked,
     f.is_completed,
-    COALESCE(cr.is_first_call, TRUE) AS is_first_call
+    COALESCE(cr.is_first_call, TRUE) AS is_first_call,
+    (
+        f.meeting_category IN ('RC', 'PWC', 'WB')
+        AND f.is_completed
+        AND COALESCE(f.activity_type, '') != 'Renewal Follow-up'
+    ) AS is_closing_call
 FROM filtered AS f
 LEFT JOIN completed_ranked AS cr ON f.meeting_id = cr.meeting_id
