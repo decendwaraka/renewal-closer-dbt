@@ -1,5 +1,24 @@
+{{ config(materialized='view') }}
+
 -- HubSpot Pipeline Snapshot (#36-#51). LIVE deal-stage counts per closer -- NOT date filtered.
 -- Counts each closer's deals by current stage, mapped to wireframe columns via dim_renewal_stages.
+--
+-- materialized='view' (2026-08-14): this was the one "live snapshot" mart still stuck as a table --
+-- every sibling live mart (fct_renewal_cash, fct_renewal_meetings, fct_renewal_won_deals,
+-- fct_renewal_stage_entries) got this same fix on 2026-08-08, but this file was created after that pass
+-- and never got it. As a table it only reflected HubSpot's state as of the last `dbt run`, contradicting
+-- its own "LIVE" claim above -- caught because a closer's live Nurture-stage deal count didn't match
+-- what was still sitting in the built table (deals had migrated pipelines since the last build).
+--
+-- STALE AS OF 2026-08-14: the "10 actual stage IDs" below was enumerated by grouping live deal data
+-- (a stage with zero deals at query time doesn't show up that way), same blind spot that caused the
+-- Nurture/Redzone gap this file's dim_renewal_stages seed just got fixed for. The new pipeline's raw
+-- Fivetran-synced MARKETING_DB.RAW.DEAL_PIPELINE_STAGE table lists 26 defined stages, not 10 -- including
+-- a "Renewal Call Due" (1376144296) and a "Progress Call 1 Due" / "Progress Call 2 Due" pair, which may
+-- make the date-based rc_due workaround below (and the still-open pc_due gap) unnecessary. Not
+-- investigated further here -- scoped this pass to Nurture/Redzone only -- but worth a fresh look before
+-- adding more date-based workarounds: query DEAL_PIPELINE_STAGE for the full defined stage list instead
+-- of relying on which stages currently hold a deal.
 --
 -- rc_due date-based fix (2026-08-13, investigation): the new Renewal Pipeline (898243912) has no
 -- "Due"-equivalent stage at all (confirmed live: its 10 actual stage IDs don't include anything Due-like),

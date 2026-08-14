@@ -25,6 +25,8 @@ stage_id,pipeline_id,stage_label,stage_group,snapshot_col
 1359841802,898243912,Renewal Call Not Completed,renewal_pipeline,rc_not_cmplt
 1359841456,898243912,Closed Won,other,closed_won
 1359841457,898243912,Closed Lost,other,closed_lost
+1359841803,898243912,Nurture,other,nurture
+1359841804,898243912,Red Zone,other,redzone
 1401758771,917643668,Winback Eligible,winback,wb_eligible
 1401758772,917643668,Winback Attempting Contact,winback,wb_attempting
 1401758773,917643668,Winback Booked,winback,wb_booked
