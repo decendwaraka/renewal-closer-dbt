@@ -51,6 +51,12 @@ renamed AS (
         COALESCE(property_hs_v_2_date_entered_240516942, property_hs_v_2_date_entered_1359841800)  AS date_entered_rc_invited,
         COALESCE(property_hs_v_2_date_entered_186350393, property_hs_v_2_date_entered_1359841801)  AS date_entered_rc_scheduled,
 
+        -- Generic "date entered whatever stage the deal is CURRENTLY in" (HubSpot system property,
+        -- confirmed live 100% populated across all 3 pipelines incl. Win-Back, which has no per-stage
+        -- date_entered_<id> columns of its own). Since Pipeline Snapshot already buckets each deal by
+        -- its current dealstage_id, this one column is enough to date-window every snapshot_col bucket.
+        property_hs_v_2_date_entered_current_stage                  AS date_entered_current_stage,
+
         -- Membership Expiration Date (RC Due date-based logic). Midnight-anchored HubSpot date property
         -- (confirmed live: always 00:00:00+00 time-of-day), so it's a hubspot_date_to_et_date candidate,
         -- not a real timestamp -- staged raw here, converted downstream where used.
