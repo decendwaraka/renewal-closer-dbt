@@ -35,7 +35,12 @@ models:
                 - 'SCHEDULED'
 
   - name: fct_renewal_pipeline_snapshot
-    description: "Live per-closer deal-stage counts (#36-#51). Not date filtered. rc_due is date-computed (Membership Expiration Date) for the new Renewal Pipeline (898243912) only, per-stage lookup elsewhere; excludes deals linked to Internal Test contacts."
+    description: "Per-closer deal-stage fact (#36-#51): one row per (deal, current snapshot_col bucket), dated by entry_date_et so any date window can be applied downstream -- deals that entered their current stage during the selected range. rc_due's entry_date_et is date-computed (45 days before Membership Expiration Date) for the new Renewal Pipeline (898243912) only, per-stage date_entered_current_stage elsewhere; excludes deals linked to Internal Test contacts."
+    columns:
+      - name: deal_id
+        tests: [not_null]
+      - name: entry_date_et
+        tests: [not_null]
 
   - name: fct_renewal_stage_entries
     description: "Deal-grain fact: one row per (deal_id, stage_entry_type, entry_date_et) for PC/RC Invited/Scheduled stage-entry dates, across both renewal pipelines. Feeds the cohort-based PC/RC Book% formula (entered Invited this month / entered Scheduled this month). Not pre-aggregated -- apply date windows downstream."
@@ -56,14 +61,14 @@ models:
 
 unit_tests:
   - name: test_pipeline_snapshot_maps_winback_and_renewal_stages
-    description: "Winback and renewal-pipeline stages both roll up to the right snapshot_col per closer, and different pipelines/closers don't bleed into each other's counts."
+    description: "Winback and renewal-pipeline stages both roll up to the right snapshot_col per closer, dated by entry_date_et, and different pipelines/closers don't bleed into each other's rows."
     model: fct_renewal_pipeline_snapshot
     given:
       - input: ref('stg_renewal__deals')
         rows:
-          - {deal_id: 1, closer_owner_id: '82672208', pipeline_id: '917643668', dealstage_id: '1401758773'}
-          - {deal_id: 2, closer_owner_id: '82672208', pipeline_id: '917643668', dealstage_id: '1401758773'}
-          - {deal_id: 3, closer_owner_id: '82734543', pipeline_id: '95211801', dealstage_id: '175346325'}
+          - {deal_id: 1, closer_owner_id: '82672208', pipeline_id: '917643668', dealstage_id: '1401758773', date_entered_current_stage: '2026-06-15T18:00:00'}
+          - {deal_id: 2, closer_owner_id: '82672208', pipeline_id: '917643668', dealstage_id: '1401758773', date_entered_current_stage: '2026-06-20T18:00:00'}
+          - {deal_id: 3, closer_owner_id: '82734543', pipeline_id: '95211801', dealstage_id: '175346325', date_entered_current_stage: '2026-07-01T18:00:00'}
       - input: ref('dim_renewal_stages')
         rows:
           - {stage_id: '1401758773', pipeline_id: '917643668', stage_group: 'winback', snapshot_col: 'wb_booked'}
@@ -76,8 +81,9 @@ unit_tests:
         rows: []
     expect:
       rows:
-        - {closer_owner_id: '82672208', closer_name: 'Sufijan Cunningham', pipeline_id: '917643668', stage_group: 'winback', snapshot_col: 'wb_booked', deal_count: 2}
-        - {closer_owner_id: '82734543', closer_name: 'Elisabeth Rogers', pipeline_id: '95211801', stage_group: 'progress_call', snapshot_col: 'pc_scheduled', deal_count: 1}
+        - {closer_owner_id: '82672208', closer_name: 'Sufijan Cunningham', pipeline_id: '917643668', stage_group: 'winback', snapshot_col: 'wb_booked', deal_id: 1, entry_date_et: '2026-06-15'}
+        - {closer_owner_id: '82672208', closer_name: 'Sufijan Cunningham', pipeline_id: '917643668', stage_group: 'winback', snapshot_col: 'wb_booked', deal_id: 2, entry_date_et: '2026-06-20'}
+        - {closer_owner_id: '82734543', closer_name: 'Elisabeth Rogers', pipeline_id: '95211801', stage_group: 'progress_call', snapshot_col: 'pc_scheduled', deal_id: 3, entry_date_et: '2026-07-01'}
 
   - name: test_pipeline_snapshot_drops_unknown_stage_or_non_closer_owner
     description: "Deals on a stage_id absent from dim_renewal_stages, or owned by someone outside dim_closers, are silently excluded -- INNER JOIN by design (matches the accepted OPEN_ISSUES #9 roster decision), not a bug."
@@ -99,13 +105,13 @@ unit_tests:
       rows: []
 
   - name: test_pipeline_snapshot_excludes_internal_test_contacts
-    description: "A deal linked to an Internal Test contact is excluded entirely (Sub-task 3, 2026-08-13); a deal with no test-contact match still counts normally."
+    description: "A deal linked to an Internal Test contact is excluded entirely (Sub-task 3, 2026-08-13); a deal with no test-contact match still counts normally, dated by its own entry_date_et."
     model: fct_renewal_pipeline_snapshot
     given:
       - input: ref('stg_renewal__deals')
         rows:
-          - {deal_id: 1, closer_owner_id: '82672208', pipeline_id: '95211801', dealstage_id: '175346325'}
-          - {deal_id: 2, closer_owner_id: '82672208', pipeline_id: '95211801', dealstage_id: '175346325'}
+          - {deal_id: 1, closer_owner_id: '82672208', pipeline_id: '95211801', dealstage_id: '175346325', date_entered_current_stage: '2026-06-15T18:00:00'}
+          - {deal_id: 2, closer_owner_id: '82672208', pipeline_id: '95211801', dealstage_id: '175346325', date_entered_current_stage: '2026-06-18T18:00:00'}
       - input: ref('dim_renewal_stages')
         rows:
           - {stage_id: '175346325', pipeline_id: '95211801', stage_group: 'progress_call', snapshot_col: 'pc_scheduled'}
@@ -117,4 +123,23 @@ unit_tests:
           - {deal_id: 1, is_test_contact: true}
     expect:
       rows:
-        - {closer_owner_id: '82672208', closer_name: 'Sufijan Cunningham', pipeline_id: '95211801', stage_group: 'progress_call', snapshot_col: 'pc_scheduled', deal_count: 1}
+        - {closer_owner_id: '82672208', closer_name: 'Sufijan Cunningham', pipeline_id: '95211801', stage_group: 'progress_call', snapshot_col: 'pc_scheduled', deal_id: 2, entry_date_et: '2026-06-18'}
+
+  - name: test_pipeline_snapshot_rc_due_entry_date_is_45_days_before_expiration
+    description: "New-pipeline rc_due is a synthetic bucket (no stage-based Due equivalent exists there) -- entry_date_et is computed as 45 days before Membership Expiration Date, not the day the dashboard happens to load, so it windows like every other bucket."
+    model: fct_renewal_pipeline_snapshot
+    given:
+      - input: ref('stg_renewal__deals')
+        rows:
+          - {deal_id: 1, closer_owner_id: '82672208', pipeline_id: '898243912', dealstage_id: '1359841792', membership_expiration_date: '2026-09-05'}
+      - input: ref('dim_renewal_stages')
+        rows:
+          - {stage_id: '1359841792', pipeline_id: '898243912', stage_group: 'renewal_pipeline', snapshot_col: 'pc_invited'}
+      - input: ref('dim_closers')
+        rows:
+          - {owner_id: '82672208', closer_name: 'Sufijan Cunningham'}
+      - input: ref('stg_renewal__deal_contacts')
+        rows: []
+    expect:
+      rows:
+        - {closer_owner_id: '82672208', closer_name: 'Sufijan Cunningham', pipeline_id: '898243912', stage_group: 'renewal_call', snapshot_col: 'rc_due', deal_id: 1, entry_date_et: '2026-07-22'}

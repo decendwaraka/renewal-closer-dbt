@@ -1,7 +1,21 @@
 {{ config(materialized='view') }}
 
--- HubSpot Pipeline Snapshot (#36-#51). LIVE deal-stage counts per closer -- NOT date filtered.
--- Counts each closer's deals by current stage, mapped to wireframe columns via dim_renewal_stages.
+-- HubSpot Pipeline Snapshot (#36-#51). Buckets each closer's deals by CURRENT stage (mapped to
+-- wireframe columns via dim_renewal_stages), dated by when the deal entered that current stage.
+--
+-- Grain (2026-08-14, date-range redesign): one row per (deal, current snapshot_col bucket), carrying
+-- entry_date_et -- deliberately NOT pre-aggregated to a deal_count, same convention as fct_renewal_cash/
+-- fct_renewal_won_deals/fct_renewal_stage_entries, so any date window can be applied downstream. Before
+-- this, every column here was a pure "right now" count with no date dimension at all (closed as
+-- "not a bug, by design" when first raised). Redefined per stakeholder decision: each column now means
+-- "deals that entered this stage during the selected date range," using the generic
+-- hs_v2_date_entered_current_stage property (confirmed live 100% populated across all 3 pipelines --
+-- see stg_renewal__deals.sql) rather than per-stage date_entered_<id> columns, since a deal's current
+-- bucket and its current-stage entry date always refer to the same stage by construction.
+--
+-- Closed Won stays out of this: the frontend overrides that one column with the already-validated
+-- windowed Deals Won figure (OPEN_ISSUES #21) instead of this table's own entry_date_et, so a validated
+-- number isn't swapped for an untested one. Every other column here is genuinely windowed by entry_date_et.
 --
 -- materialized='view' (2026-08-14): this was the one "live snapshot" mart still stuck as a table --
 -- every sibling live mart (fct_renewal_cash, fct_renewal_meetings, fct_renewal_won_deals,
@@ -42,7 +56,7 @@
 --
 -- Test-contact exclusion (Sub-task 3, 2026-08-13): deals linked to a HubSpot contact with Lead Status
 -- "Internal Test Record" are excluded here at the base deal grain, so it covers every snapshot_col
--- (Pipeline Snapshot Total and Win-Back Total are both very likely just SUM(deal_count) downstream).
+-- (Pipeline Snapshot Total and Win-Back Total are both very likely just COUNT(deal_id) downstream).
 
 WITH deals AS (
     SELECT
@@ -50,7 +64,8 @@ WITH deals AS (
         d.closer_owner_id,
         d.pipeline_id,
         d.dealstage_id,
-        d.membership_expiration_date
+        d.membership_expiration_date,
+        d.date_entered_current_stage
     FROM {{ ref('stg_renewal__deals') }} AS d
     LEFT JOIN {{ ref('stg_renewal__deal_contacts') }} AS tc ON d.deal_id = tc.deal_id
     WHERE COALESCE(tc.is_test_contact, FALSE) = FALSE
@@ -81,7 +96,10 @@ rc_due_computed AS (
         cl.closer_name,
         d.pipeline_id,
         'renewal_call'  AS stage_group,
-        'rc_due'        AS snapshot_col
+        'rc_due'        AS snapshot_col,
+        -- The deal "enters" rc_due 45 days before expiration, not today -- so a windowed query sees
+        -- it show up on the date it actually became due, not on whatever day the dashboard is loaded.
+        DATEADD('day', -45, {{ hubspot_date_to_et_date('d.membership_expiration_date') }}) AS entry_date_et
     FROM deals AS d
     INNER JOIN new_pipeline_pre_rc_stages AS e ON d.dealstage_id = e.stage_id
     INNER JOIN closers AS cl ON d.closer_owner_id = cl.owner_id
@@ -103,29 +121,18 @@ stage_based AS (
         s.pipeline_id,
         s.stage_group,
         s.snapshot_col,
-        d.deal_id
+        d.deal_id,
+        {{ to_et_date('d.date_entered_current_stage') }} AS entry_date_et
     FROM deals AS d
     INNER JOIN stages AS s ON d.dealstage_id = s.stage_id
     INNER JOIN closers AS cl ON d.closer_owner_id = cl.owner_id
     WHERE d.deal_id NOT IN (SELECT deal_id FROM rc_due_computed)
 ),
 
-combined AS (
-    SELECT closer_owner_id, closer_name, pipeline_id, stage_group, snapshot_col, deal_id FROM stage_based
-    UNION ALL
-    SELECT closer_owner_id, closer_name, pipeline_id, stage_group, snapshot_col, deal_id FROM rc_due_computed
-),
-
 final AS (
-    SELECT
-        closer_owner_id,
-        closer_name,
-        pipeline_id,
-        stage_group,
-        snapshot_col,
-        COUNT(deal_id) AS deal_count
-    FROM combined
-    GROUP BY 1, 2, 3, 4, 5
+    SELECT closer_owner_id, closer_name, pipeline_id, stage_group, snapshot_col, deal_id, entry_date_et FROM stage_based
+    UNION ALL
+    SELECT closer_owner_id, closer_name, pipeline_id, stage_group, snapshot_col, deal_id, entry_date_et FROM rc_due_computed
 )
 
 SELECT * FROM final
