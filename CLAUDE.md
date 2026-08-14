@@ -4,6 +4,15 @@ dbt project powering the Renewal Closer dashboard (frontend repo: `Dashboards/re
 a separate git repo). Transforms Fivetran-synced HubSpot data in Snowflake into the marts the
 dashboard reads from `PRODUCTION.RENEWAL_MARTS`.
 
+## Read .claude/memory/ before starting work
+
+`.claude/memory/` mirrors this project's accumulated session memory (business logic, prior
+validation findings, resolved issues, feedback on how to work in this repo) — local-only, not
+committed. Start with `MEMORY.md` there for the index, then read whichever linked files are
+relevant to the task at hand. It's a snapshot as of when it was copied — if something it says
+conflicts with the current state of the code or `ref_docs/OPEN_ISSUES.md`, trust what you observe
+now over the memory file.
+
 ## Always update ref_docs/OPEN_ISSUES.md after fixing anything
 
 `ref_docs/OPEN_ISSUES.md` is the living, authoritative tracker of every known defect/gap in this
