@@ -24,3 +24,9 @@ models:
     columns:
       - name: deal_id
         tests: [unique, not_null]
+
+  - name: stg_renewal__contact_webinar_bookings
+    description: "One row per contact with a parsed post-renewal-webinar booking date, from the renewal_webinars__booked property value (interim Post-Webinar attribution, OPEN_ISSUES #33)."
+    columns:
+      - name: contact_id
+        tests: [unique, not_null]

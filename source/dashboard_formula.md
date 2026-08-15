@@ -228,7 +228,7 @@ Windowed. A condensed rate view using the **same** counts as Section 3.
   | RC Book% | RC Booked ÷ RC Invited | `safePct(rc_booked, rc_invited)` |
   | RC Show% | RC Completed ÷ RC Booked | `safePct(rc_completed, rc_booked)` |
   | PWC Completed | Completed post-webinar calls (count) | `pwc_completed` |
-  | PWC Close% | Deals Won ÷ PWC Completed (spec #57) | `safePct(deals_won, pwc_completed)` |
+  | PWC Close% | PWC Deals Won ÷ PWC Completed (spec #57) -- numerator scoped to post-webinar-attributed closes only (OPEN_ISSUES #33), distinct from PC/RC/WB Close% | `safePct(pwc_deals_won, pwc_completed)` |
 - **Average row** = pooled ratio (`Σ` numerators ÷ `Σ` denominators), same as Section 3.
 - **Source:** `FCT_RENEWAL_MEETINGS` (same query as Section 3).
 

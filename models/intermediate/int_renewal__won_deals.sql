@@ -41,6 +41,30 @@ won AS (
         d.pipeline_id = '{{ var('winback_pipeline_id') }}'
         AND d.dealstage_id IN ({{ "'" ~ var('winback_won_stage_ids') | join("','") ~ "'" }})
     )
+),
+
+-- Post-Webinar attribution (OPEN_ISSUES #33): a deal counts as post-webinar-attributed if any
+-- associated contact booked a post-renewal-webinar call within 30 days before/on the close date.
+deal_contact AS (
+    SELECT deal_id, contact_id
+    FROM {{ source('hubspot_raw', 'DEAL_CONTACT') }}
+),
+
+post_webinar_flag AS (
+    SELECT
+        dc.deal_id,
+        BOOLOR_AGG(
+            pwb.booked_at_et BETWEEN DATEADD('day', -30, w.close_date_et) AND w.close_date_et
+        ) AS is_post_webinar_close
+    FROM won AS w
+    INNER JOIN deal_contact AS dc ON w.deal_id = dc.deal_id
+    LEFT JOIN {{ ref('stg_renewal__contact_webinar_bookings') }} AS pwb
+        ON pwb.contact_id = dc.contact_id::VARCHAR
+    GROUP BY dc.deal_id
 )
 
-SELECT * FROM won
+SELECT
+    w.*,
+    COALESCE(pwf.is_post_webinar_close, FALSE) AS is_post_webinar_close
+FROM won AS w
+LEFT JOIN post_webinar_flag AS pwf ON w.deal_id = pwf.deal_id
