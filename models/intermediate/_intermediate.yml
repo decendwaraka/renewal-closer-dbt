@@ -69,6 +69,10 @@ unit_tests:
       - input: ref('dim_closers')
         rows:
           - {owner_id: '82672208', closer_name: 'Sufijan Cunningham'}
+      - input: source('hubspot_raw', 'DEAL_CONTACT')
+        rows: []
+      - input: ref('stg_renewal__contact_webinar_bookings')
+        rows: []
     expect:
       rows:
         - {deal_id: 1, closer_owner_id: '82672208', pipeline_id: '917643668', dealstage_id: '1401758776', close_date_et: "2026-08-01", cash_collected: 12000}
@@ -85,5 +89,9 @@ unit_tests:
       - input: ref('dim_closers')
         rows:
           - {owner_id: '82672208', closer_name: 'Sufijan Cunningham'}
+      - input: source('hubspot_raw', 'DEAL_CONTACT')
+        rows: []
+      - input: ref('stg_renewal__contact_webinar_bookings')
+        rows: []
     expect:
       rows: []

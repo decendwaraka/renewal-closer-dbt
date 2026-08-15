@@ -11,7 +11,8 @@ WITH won AS (
         closer_owner_id,
         pipeline_id,
         dealstage_id,
-        close_date_et
+        close_date_et,
+        is_post_webinar_close
     FROM {{ ref('int_renewal__won_deals') }}
 )
 
@@ -21,6 +22,7 @@ SELECT
     cl.closer_name,
     w.pipeline_id,
     w.dealstage_id,
-    w.close_date_et
+    w.close_date_et,
+    w.is_post_webinar_close
 FROM won AS w
 LEFT JOIN {{ ref('dim_closers') }} AS cl ON w.closer_owner_id = cl.owner_id
