@@ -6,6 +6,10 @@ ref_docs/*
 logs/*
 target/*
 
-git remote add origin https://github.com/decendwaraka/renewal-closer-dbt.git
-git branch -M main
-git push -u origin main
+# agent/editor state
+.claude/*
+
+# python (validation harness)
+__pycache__/
+*.pyc
+.env
