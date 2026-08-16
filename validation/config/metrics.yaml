@@ -1,0 +1,422 @@
+# Declarative metric definitions for the HubSpot <-> Snowflake validation framework.
+#
+# THIS FILE IS SEEDED FROM THE METRIC GLOSSARY (metric-catalog.ts + dashboard_formula.md +
+# the dbt seeds), NOT from the real live HubSpot dashboard's actual filter list -- that
+# list doesn't exist yet. When it arrives, edit the `hubspot:` block of the relevant
+# metric id(s) below; nothing in runner.py/compare.py/cli.py needs to change.
+#
+# Every `snowflake.sql` uses %(start)s / %(end)s / %(owner_id)s bind params (pyformat,
+# matches snowflake-connector-python's default paramstyle). owner_id is nullable --
+# omit the owner filter clause at the call site for team-level totals.
+#
+# HubSpot property names marked "CONFIRM" are Fivetran staging-alias best guesses, not
+# verified live property names -- per the validate-metric skill's rule, never trust a
+# staging alias as the live name. Run HubSpot's get_properties/search_properties (or
+# the MCP tool_guidance-recommended equivalent) once per property before the first real
+# run and correct any that differ.
+#
+# Formula numbers in `formula_refs` cite source/dashboard_formula.md's numbering
+# (extends the original 57-formula spec to 74 incl. Win-Back).
+
+closers_seed: ../seeds/dim_closers.csv          # owner_id,closer_name -- iterate for per-closer runs
+product_map_seed: ../seeds/dim_product_map.csv  # upsell_plan,product_column
+stages_seed: ../seeds/dim_renewal_stages.csv     # stage_id,pipeline_id,stage_label,stage_group,snapshot_col
+                                                   # (pipeline_snapshot.* metrics are auto-generated from this
+                                                   #  file by metrics.py -- see load_pipeline_snapshot_metrics)
+
+pipelines:
+  renewal_sales: "95211801"
+  renewal_pipeline: "898243912"
+  winback: "917643668"
+won_stage_ids: ["175346331", "229787714", "1359841456"]      # Closed Won-PIF / Closed Won-Payment Plan / Closed Won
+winback_won_stage_ids: ["1401758776"]                          # Winback Closed Won
+
+metrics:
+
+  # --- Core leaderboard metrics (#1-4, #35; also #7-9 when window=today) ---
+
+  - id: deals_won
+    name: "Deals Won"
+    formula_refs: ["#2", "#7", "#33"]
+    snowflake:
+      sql: |
+        SELECT COUNT(*) AS value
+        FROM PRODUCTION.RENEWAL_MARTS.FCT_RENEWAL_WON_DEALS
+        WHERE close_date_et BETWEEN %(start)s AND %(end)s
+          AND (%(owner_id)s IS NULL OR closer_owner_id = %(owner_id)s)
+    hubspot:
+      object: deals
+      aggregation: count
+      filters:
+        - {property: pipeline, operator: IN, value: ["95211801", "898243912", "917643668"]}
+        - {property: dealstage, operator: IN, value: ["175346331", "229787714", "1359841456", "1401758776"]}
+        - {property: hubspot_owner_id, operator: EQ, value: ":owner_id"}   # CONFIRM: deal owner is top-level ownerId, not a "property" filter -- see note below
+        - {property: upsell___close_date, operator: BETWEEN, value: [":start", ":end"]}  # CONFIRM live name (Fivetran collapses upsell___close_date)
+    comparison: {mode: exact, tolerance: 0}
+    caveats:
+      - "deal owner in HubSpot's search API is the object-level `hubspot_owner_id` associated property, not `owner_id` -- confirm exact filter property name via search_properties before first run"
+      - "cut window off at yesterday ET by default -- same-day Fivetran sync lag produces false-positive gaps (see project memory)"
+
+  - id: total_cash
+    name: "Total Cash / Rainmaker"
+    formula_refs: ["#1", "#8"]
+    snowflake:
+      sql: |
+        SELECT SUM(cash_amount) AS value
+        FROM PRODUCTION.RENEWAL_MARTS.FCT_RENEWAL_CASH
+        WHERE cash_date_et BETWEEN %(start)s AND %(end)s
+          AND (%(owner_id)s IS NULL OR closer_owner_id = %(owner_id)s)
+    hubspot:
+      object: deals
+      aggregation: sum_dated_components
+      base_filters:
+        - {property: pipeline, operator: IN, value: ["95211801", "898243912", "917643668"]}
+        - {property: dealstage, operator: IN, value: ["175346331", "229787714", "1359841456", "1401758776"]}
+        - {property: hubspot_owner_id, operator: EQ, value: ":owner_id"}
+      components:   # each dated by its OWN stamped date, not close date -- mirrors int_renewal__deal_cash.sql
+        - {amount_prop: cash_collected, date_prop: upsell___close_date}                                  # CONFIRM: base cash component's own "date" is deal close date in the dbt model
+        - {amount_prop: additional_payment_1_amount, date_prop: additional_payment_1_stamped_date}       # CONFIRM
+        - {amount_prop: additional_payment_2_amount, date_prop: additional_payment_2_stamped_date}       # CONFIRM
+        - {amount_prop: collected_amount__additional_payment_3, date_prop: collected_date__additional_payment_3}  # CONFIRM
+        - {amount_prop: collected_amount__additional_payment_4, date_prop: collected_date__additional_payment_4}  # CONFIRM
+    comparison: {mode: exact, tolerance: 1.00}
+    caveats:
+      - "base+AP1+AP2+AP3+AP4 only, by design -- AP5-12 exist as properties but are 0-populated account-wide (re-verified live 2026-08-11, not a sync gap)"
+      - "AP1/AP2 property names use a different naming pattern than AP3/AP4 in live HubSpot -- both are Fivetran staging-alias guesses, confirm both patterns independently"
+
+  # --- Call Outcomes (#10-21, #52-57 for PC/RC/PWC; #69-74 for Win-Back) ---
+  # invited/booked are DEAL-STAGE-BASIS per OPEN_ISSUES #17 (dashboard moved off the
+  # original meeting-object-basis spec) -- filter on dealstage_id via dim_renewal_stages,
+  # not on the meeting object. completed stays meeting-object-basis (no stage tracks it).
+
+  - id: pc_invited
+    name: "PC Invited"
+    formula_refs: ["#10"]
+    snowflake:
+      sql: |
+        SELECT COUNT(deal_count) AS value FROM (
+          SELECT deal_count FROM PRODUCTION.RENEWAL_MARTS.FCT_RENEWAL_PIPELINE_SNAPSHOT
+          WHERE snapshot_col = 'pc_invited' AND (%(owner_id)s IS NULL OR closer_owner_id = %(owner_id)s)
+        )
+    hubspot:
+      object: deals
+      aggregation: count
+      filters:
+        - {property: dealstage, operator: IN, value: ["240516941", "1359841792"]}
+        - {property: hubspot_owner_id, operator: EQ, value: ":owner_id"}
+    comparison: {mode: exact, tolerance: 0}
+    caveats: ["live/current-state count, not date-windowed -- matches dashboard's Pipeline Snapshot semantics"]
+
+  - id: pc_booked
+    name: "PC Booked"
+    formula_refs: ["#11"]
+    snowflake:
+      sql: |
+        SELECT COUNT(deal_count) AS value FROM (
+          SELECT deal_count FROM PRODUCTION.RENEWAL_MARTS.FCT_RENEWAL_PIPELINE_SNAPSHOT
+          WHERE snapshot_col = 'pc_scheduled' AND (%(owner_id)s IS NULL OR closer_owner_id = %(owner_id)s)
+        )
+    hubspot:
+      object: deals
+      aggregation: count
+      filters:
+        - {property: dealstage, operator: IN, value: ["175346325", "1359841793"]}
+        - {property: hubspot_owner_id, operator: EQ, value: ":owner_id"}
+    comparison: {mode: exact, tolerance: 0}
+    caveats: ["stage_label is 'Midway Check In Scheduled' -- dashboard calls this tile 'Booked'"]
+
+  - id: pc_completed
+    name: "PC Completed"
+    formula_refs: ["#12"]
+    snowflake:
+      sql: |
+        SELECT COUNT(*) AS value
+        FROM PRODUCTION.RENEWAL_MARTS.FCT_RENEWAL_MEETINGS
+        WHERE meeting_category = 'PC' AND is_completed
+          AND meeting_date_et BETWEEN %(start)s AND %(end)s
+          AND (%(owner_id)s IS NULL OR closer_owner_id = %(owner_id)s)
+    hubspot:
+      object: meetings
+      aggregation: count
+      filters:
+        - {property: hs_activity_type, operator: IN, value: ["Renewal 3 Month", "Renewal Accelerator 3 month"]}
+        - {property: hs_meeting_outcome, operator: EQ, value: "COMPLETED"}   # exact match, not LIKE -- OPEN_ISSUES #7 revert
+        - {property: hubspot_owner_id, operator: EQ, value: ":owner_id"}
+        - {property: hs_meeting_start_time, operator: BETWEEN, value: [":start", ":end"]}
+    comparison: {mode: exact, tolerance: 0}
+    caveats:
+      - "is_meeting_completed macro reverted to exact = 'COMPLETED' (2026-08-06) -- COMPLETED-NURTURE/QUALIFIED sub-outcomes excluded, matches spec literally"
+      - "BETWEEN on a datetime property resolves to UTC midnight in HubSpot search -- pass full ISO timestamps with explicit offset, not bare YYYY-MM-DD, to align with the warehouse's ET day bucketing"
+
+  - id: rc_invited
+    name: "RC Invited"
+    formula_refs: ["#16"]
+    snowflake:
+      sql: |
+        SELECT COUNT(deal_count) AS value FROM (
+          SELECT deal_count FROM PRODUCTION.RENEWAL_MARTS.FCT_RENEWAL_PIPELINE_SNAPSHOT
+          WHERE snapshot_col = 'rc_invited' AND (%(owner_id)s IS NULL OR closer_owner_id = %(owner_id)s)
+        )
+    hubspot:
+      object: deals
+      aggregation: count
+      filters:
+        - {property: dealstage, operator: IN, value: ["240516942", "1359841800"]}
+        - {property: hubspot_owner_id, operator: EQ, value: ":owner_id"}
+    comparison: {mode: exact, tolerance: 0}
+    caveats: []
+
+  - id: rc_booked
+    name: "RC Booked"
+    formula_refs: ["#17"]
+    snowflake:
+      sql: |
+        SELECT COUNT(deal_count) AS value FROM (
+          SELECT deal_count FROM PRODUCTION.RENEWAL_MARTS.FCT_RENEWAL_PIPELINE_SNAPSHOT
+          WHERE snapshot_col = 'rc_scheduled' AND (%(owner_id)s IS NULL OR closer_owner_id = %(owner_id)s)
+        )
+    hubspot:
+      object: deals
+      aggregation: count
+      filters:
+        - {property: dealstage, operator: IN, value: ["186350393", "1359841801"]}
+        - {property: hubspot_owner_id, operator: EQ, value: ":owner_id"}
+    comparison: {mode: exact, tolerance: 0}
+    caveats: []
+
+  - id: rc_completed
+    name: "RC Completed"
+    formula_refs: ["#18"]
+    snowflake:
+      sql: |
+        SELECT COUNT(*) AS value
+        FROM PRODUCTION.RENEWAL_MARTS.FCT_RENEWAL_MEETINGS
+        WHERE meeting_category = 'RC' AND is_completed
+          AND meeting_date_et BETWEEN %(start)s AND %(end)s
+          AND (%(owner_id)s IS NULL OR closer_owner_id = %(owner_id)s)
+    hubspot:
+      object: meetings
+      aggregation: count
+      filters:
+        - property: hs_activity_type
+          operator: IN
+          value: ["Renewal Strategy", "Renewal Strategy Alignment", "Renewal Accelerator", "Renewal Accelerator Evergreen", "Renewal Follow-up"]
+        - {property: hs_meeting_outcome, operator: EQ, value: "COMPLETED"}
+        - {property: hubspot_owner_id, operator: EQ, value: ":owner_id"}
+        - {property: hs_meeting_start_time, operator: BETWEEN, value: [":start", ":end"]}
+    comparison: {mode: exact, tolerance: 0}
+    caveats: []
+
+  - id: pwc_completed
+    name: "PWC Completed"
+    formula_refs: ["#56"]
+    snowflake:
+      sql: |
+        SELECT COUNT(*) AS value
+        FROM PRODUCTION.RENEWAL_MARTS.FCT_RENEWAL_MEETINGS
+        WHERE meeting_category = 'PWC' AND is_completed
+          AND meeting_date_et BETWEEN %(start)s AND %(end)s
+          AND (%(owner_id)s IS NULL OR closer_owner_id = %(owner_id)s)
+    hubspot:
+      object: meetings
+      aggregation: count
+      filters:
+        - {property: hs_activity_type, operator: EQ, value: "Renewal Post Webinar Call"}
+        - {property: hs_meeting_outcome, operator: EQ, value: "COMPLETED"}
+        - {property: hubspot_owner_id, operator: EQ, value: ":owner_id"}
+        - {property: hs_meeting_start_time, operator: BETWEEN, value: [":start", ":end"]}
+    comparison: {mode: exact, tolerance: 0}
+    caveats: ["PWC has no Invited/Booked pipeline stage tracked -- Completed is the only independently-checkable PWC metric"]
+
+  - id: wb_completed
+    name: "Win-Back Call Completed"
+    formula_refs: ["#71"]
+    snowflake:
+      sql: |
+        SELECT COUNT(*) AS value
+        FROM PRODUCTION.RENEWAL_MARTS.FCT_RENEWAL_MEETINGS
+        WHERE meeting_category = 'WB' AND is_completed
+          AND meeting_date_et BETWEEN %(start)s AND %(end)s
+          AND (%(owner_id)s IS NULL OR closer_owner_id = %(owner_id)s)
+    hubspot:
+      object: meetings
+      aggregation: count
+      filters:
+        - {property: hs_activity_type, operator: EQ, value: "Renewal Winback Call"}
+        - {property: hs_meeting_outcome, operator: EQ, value: "COMPLETED"}
+        - {property: hubspot_owner_id, operator: EQ, value: ":owner_id"}
+        - {property: hs_meeting_start_time, operator: BETWEEN, value: [":start", ":end"]}
+    comparison: {mode: exact, tolerance: 0}
+    caveats:
+      - "formula number is a best guess -- Win-Back Call Outcomes (#69-74) were added to metric-catalog.ts after the numbered spec doc; re-confirm exact numbering against metric-catalog.ts before reporting formula refs externally"
+
+  - id: wb_booked
+    name: "Win-Back Booked"
+    formula_refs: ["#70"]
+    snowflake:
+      sql: |
+        SELECT COUNT(deal_count) AS value FROM (
+          SELECT deal_count FROM PRODUCTION.RENEWAL_MARTS.FCT_RENEWAL_PIPELINE_SNAPSHOT
+          WHERE snapshot_col = 'wb_booked' AND (%(owner_id)s IS NULL OR closer_owner_id = %(owner_id)s)
+        )
+    hubspot:
+      object: deals
+      aggregation: count
+      filters:
+        - {property: dealstage, operator: EQ, value: "1401758773"}
+        - {property: hubspot_owner_id, operator: EQ, value: ":owner_id"}
+    comparison: {mode: exact, tolerance: 0}
+    caveats: ["Win-Back Invited/Booked stage mapping (eligible/attempting/booked) not yet cross-checked against metric-catalog.ts's exact tile definitions -- verify before first real run"]
+
+  # --- Cash by product tier (#22-24) ---
+
+  - id: acc_tier_cash
+    name: "Cash by Product -- ACC Tier"
+    formula_refs: ["#22"]
+    snowflake:
+      sql: |
+        SELECT SUM(cash_amount) AS value
+        FROM PRODUCTION.RENEWAL_MARTS.FCT_RENEWAL_CASH
+        WHERE product_column = 'ACC_TIER'
+          AND cash_date_et BETWEEN %(start)s AND %(end)s
+          AND (%(owner_id)s IS NULL OR closer_owner_id = %(owner_id)s)
+    hubspot:
+      object: deals
+      aggregation: sum_dated_components
+      base_filters:
+        - {property: pipeline, operator: IN, value: ["95211801", "898243912", "917643668"]}
+        - {property: dealstage, operator: IN, value: ["175346331", "229787714", "1359841456", "1401758776"]}
+        - {property: hubspot_owner_id, operator: EQ, value: ":owner_id"}
+        - property: upsell_plan   # CONFIRM live name (property_upsell_plan staging alias)
+          operator: IN
+          value: ["Renewal - Accelerator Gems", "Renewal - Accelerator Plus", "Renewal - Accelerator DIY",
+                   "Upgrade DIY to Acc Plus", "Upgrade DIY to Acc Gems", "Winback - Acc Plus", "Winback - Acc Gems"]
+      components:
+        - {amount_prop: cash_collected, date_prop: upsell___close_date}
+        - {amount_prop: additional_payment_1_amount, date_prop: additional_payment_1_stamped_date}
+        - {amount_prop: additional_payment_2_amount, date_prop: additional_payment_2_stamped_date}
+        - {amount_prop: collected_amount__additional_payment_3, date_prop: collected_date__additional_payment_3}
+        - {amount_prop: collected_amount__additional_payment_4, date_prop: collected_date__additional_payment_4}
+    comparison: {mode: exact, tolerance: 1.00}
+    caveats: ["upsell_plan value list transcribed from seeds/dim_product_map.csv -- re-sync this list if the seed changes"]
+
+  - id: mm_tier_cash
+    name: "Cash by Product -- MM Tier"
+    formula_refs: ["#23"]
+    snowflake:
+      sql: |
+        SELECT SUM(cash_amount) AS value
+        FROM PRODUCTION.RENEWAL_MARTS.FCT_RENEWAL_CASH
+        WHERE product_column = 'MM_TIER'
+          AND cash_date_et BETWEEN %(start)s AND %(end)s
+          AND (%(owner_id)s IS NULL OR closer_owner_id = %(owner_id)s)
+    hubspot:
+      object: deals
+      aggregation: sum_dated_components
+      base_filters:
+        - {property: pipeline, operator: IN, value: ["95211801", "898243912", "917643668"]}
+        - {property: dealstage, operator: IN, value: ["175346331", "229787714", "1359841456", "1401758776"]}
+        - {property: hubspot_owner_id, operator: EQ, value: ":owner_id"}
+        - property: upsell_plan
+          operator: IN
+          value: ["Upgrade - Mastermind Pro", "Upgrade - Mastermind Premium", "Restart - Mastermind Pro",
+                   "Restart - Mastermind Premium", "Renewal - Mastermind Lite", "Winback - MM Pro", "Winback - MM Premium"]
+      components:
+        - {amount_prop: cash_collected, date_prop: upsell___close_date}
+        - {amount_prop: additional_payment_1_amount, date_prop: additional_payment_1_stamped_date}
+        - {amount_prop: additional_payment_2_amount, date_prop: additional_payment_2_stamped_date}
+        - {amount_prop: collected_amount__additional_payment_3, date_prop: collected_date__additional_payment_3}
+        - {amount_prop: collected_amount__additional_payment_4, date_prop: collected_date__additional_payment_4}
+    comparison: {mode: exact, tolerance: 1.00}
+    caveats: []
+
+  - id: term2_cash
+    name: "Cash by Product -- Term 2 (B/G/P)"
+    formula_refs: ["#24"]
+    snowflake:
+      sql: |
+        SELECT SUM(cash_amount) AS value
+        FROM PRODUCTION.RENEWAL_MARTS.FCT_RENEWAL_CASH
+        WHERE product_column = 'TERM_2'
+          AND cash_date_et BETWEEN %(start)s AND %(end)s
+          AND (%(owner_id)s IS NULL OR closer_owner_id = %(owner_id)s)
+    hubspot:
+      object: deals
+      aggregation: sum_dated_components
+      base_filters:
+        - {property: pipeline, operator: IN, value: ["95211801", "898243912", "917643668"]}
+        - {property: dealstage, operator: IN, value: ["175346331", "229787714", "1359841456", "1401758776"]}
+        - {property: hubspot_owner_id, operator: EQ, value: ":owner_id"}
+        - property: upsell_plan
+          operator: IN
+          value: ["Bronze", "Gold", "Platinum", "Renewal - Diamond", "Renewal - Silver",
+                   "Upgrade Bronze to Gold", "Upgrade Gold to Platinum", "WB Renewal - Gold",
+                   "WB Renewal - Bronze", "WB Renewal - Platinum", "Winback - Silver"]
+      components:
+        - {amount_prop: cash_collected, date_prop: upsell___close_date}
+        - {amount_prop: additional_payment_1_amount, date_prop: additional_payment_1_stamped_date}
+        - {amount_prop: additional_payment_2_amount, date_prop: additional_payment_2_stamped_date}
+        - {amount_prop: collected_amount__additional_payment_3, date_prop: collected_date__additional_payment_3}
+        - {amount_prop: collected_amount__additional_payment_4, date_prop: collected_date__additional_payment_4}
+    comparison: {mode: exact, tolerance: 1.00}
+    caveats: []
+
+# --- Derived metrics (#3-4, #13-15, #19-21, #34, #57, #72-74) ---
+# Computed from two already-fetched base metrics on EACH side independently
+# (Snowflake ratio vs HubSpot ratio), never issued as their own HubSpot query --
+# HubSpot's search API has no native ratio/division aggregation.
+
+derived:
+  - id: pc_book_pct
+    name: "PC Book%"
+    formula_refs: ["#13"]
+    formula: "pc_booked / pc_invited"
+
+  - id: pc_show_pct
+    name: "PC Show%"
+    formula_refs: ["#14"]
+    formula: "pc_completed / pc_booked"
+
+  - id: pc_close_pct
+    name: "PC Close%"
+    formula_refs: ["#15"]
+    formula: "deals_won / pc_completed"
+    caveats: ["numerator reuses the closer's TOTAL deals_won, not PC-attributed deals -- by design (validated 2026-08-04), can exceed 100%"]
+
+  - id: rc_book_pct
+    name: "RC Book%"
+    formula_refs: ["#19"]
+    formula: "rc_booked / rc_invited"
+
+  - id: rc_show_pct
+    name: "RC Show%"
+    formula_refs: ["#20"]
+    formula: "rc_completed / rc_booked"
+
+  - id: rc_close_pct
+    name: "RC Close%"
+    formula_refs: ["#21"]
+    formula: "deals_won / rc_completed"
+    caveats: ["same total-deals_won-numerator design as pc_close_pct"]
+
+  - id: pwc_close_pct
+    name: "PWC Close%"
+    formula_refs: ["#57"]
+    formula: "pwc_deals_won / pwc_completed"
+    caveats: ["numerator scoped to post-webinar-attributed closes only (OPEN_ISSUES #33), unlike pc_close_pct/rc_close_pct/wb_close_pct which use the unscoped total deals_won"]
+
+  - id: wb_book_pct
+    name: "Win-Back Book%"
+    formula_refs: ["#72"]
+    formula: "wb_booked / wb_invited"
+
+  - id: live_close_pct
+    name: "Team Live Close %"
+    formula_refs: ["#3"]
+    formula: "deals_won / (rc_completed + pwc_completed + wb_completed)"
+    caveats: ["live_meetings excludes PC (progress calls aren't 'live' closing calls) -- matches rpt_renewal_closer_dashboard.sql's meeting_category IN ('RC','PWC','WB') filter"]
+
+  - id: avg_dpl
+    name: "Avg $ per Live Call (DPL)"
+    formula_refs: ["#4"]
+    formula: "total_cash / (rc_completed + pwc_completed + wb_completed)"

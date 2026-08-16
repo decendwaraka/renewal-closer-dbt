@@ -1,0 +1,6 @@
+snowflake-connector-python>=3.6
+cryptography>=42.0
+requests>=2.31
+PyYAML>=6.0
+python-dotenv>=1.0
+tabulate>=0.9
