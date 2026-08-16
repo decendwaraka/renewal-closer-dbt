@@ -19,6 +19,15 @@ renamed AS (
         deal_pipeline_stage_id::VARCHAR                             AS dealstage_id,
         property_upsell_close_date                                  AS close_date,
 
+        -- PC Due midpoint start-date fallback (Travis/Celeste decision, 2026-08-15): membership
+        -- midpoint = midpoint(start date, Membership Expiration Date), where start date prioritizes
+        -- Renewal - Close Date (close_date above) and falls back to this plain HubSpot Close Date when
+        -- Renewal - Close Date is blank (true for ~77% of renewal-pipeline deals, live-checked). Unlike
+        -- close_date/membership_expiration_date, this is a REAL timestamp with time-of-day (confirmed
+        -- live: only 3/2862 land on exact midnight UTC), so downstream conversion must use to_et_date,
+        -- not hubspot_date_to_et_date.
+        property_closedate                                          AS close_date_fallback,
+
         -- cash components (base + AP1 + AP2 + AP3 + AP4 available today)
         property_cash_collected                                     AS cash_collected,
         property_additional_payment_1_amount                        AS ap1_amount,
