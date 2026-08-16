@@ -143,3 +143,41 @@ unit_tests:
     expect:
       rows:
         - {closer_owner_id: '82672208', closer_name: 'Sufijan Cunningham', pipeline_id: '898243912', stage_group: 'renewal_call', snapshot_col: 'rc_due', deal_id: 1, entry_date_et: '2026-07-22'}
+
+  - name: test_pipeline_snapshot_pc_due_entry_date_is_45_days_before_midpoint
+    description: "New-pipeline pc_due is a synthetic bucket like rc_due -- entry_date_et is 45 days before the membership midpoint, where midpoint = halfway between the start date (Renewal - Close Date, else Close Date) and Membership Expiration Date. Fixture: 2026-02-15 to 2027-02-15 (365d) -> midpoint 2026-08-16 -> entry 2026-07-02. TIME-DEPENDENT (same caveat as the rc_due test above): pc_due only fires while today is inside [midpoint-45, midpoint+45], so this fixture stops matching after 2026-09-30 and the dates need bumping -- a stale fixture, not a logic regression."
+    model: fct_renewal_pipeline_snapshot
+    given:
+      - input: ref('stg_renewal__deals')
+        rows:
+          - {deal_id: 1, closer_owner_id: '82672208', pipeline_id: '898243912', dealstage_id: '1359829634', close_date: '2026-02-15', membership_expiration_date: '2027-02-15'}
+      - input: ref('dim_renewal_stages')
+        rows:
+          - {stage_id: '1359829634', pipeline_id: '898243912', stage_group: 'renewal_pipeline', snapshot_col: 'new_member'}
+      - input: ref('dim_closers')
+        rows:
+          - {owner_id: '82672208', closer_name: 'Sufijan Cunningham'}
+      - input: ref('stg_renewal__deal_contacts')
+        rows: []
+    expect:
+      rows:
+        - {closer_owner_id: '82672208', closer_name: 'Sufijan Cunningham', pipeline_id: '898243912', stage_group: 'progress_call', snapshot_col: 'pc_due', deal_id: 1, entry_date_et: '2026-07-02'}
+
+  - name: test_pipeline_snapshot_rc_due_wins_when_deal_is_in_both_due_windows
+    description: "A deal can satisfy the pc_due midpoint window AND the rc_due pre-expiration window at once (short term, expiration near the midpoint). rc_due is the later, more urgent state and must win, so the deal lands in exactly ONE row -- otherwise it double-counts in any Total that sums deal_count across snapshot_cols. Fixture: 2026-07-25 to 2026-09-05 (42d) -> midpoint 2026-08-15, both windows contain mid-Aug 2026. TIME-DEPENDENT, same caveat as the two tests above."
+    model: fct_renewal_pipeline_snapshot
+    given:
+      - input: ref('stg_renewal__deals')
+        rows:
+          - {deal_id: 1, closer_owner_id: '82672208', pipeline_id: '898243912', dealstage_id: '1359829634', close_date: '2026-07-25', membership_expiration_date: '2026-09-05'}
+      - input: ref('dim_renewal_stages')
+        rows:
+          - {stage_id: '1359829634', pipeline_id: '898243912', stage_group: 'renewal_pipeline', snapshot_col: 'new_member'}
+      - input: ref('dim_closers')
+        rows:
+          - {owner_id: '82672208', closer_name: 'Sufijan Cunningham'}
+      - input: ref('stg_renewal__deal_contacts')
+        rows: []
+    expect:
+      rows:
+        - {closer_owner_id: '82672208', closer_name: 'Sufijan Cunningham', pipeline_id: '898243912', stage_group: 'renewal_call', snapshot_col: 'rc_due', deal_id: 1, entry_date_et: '2026-07-22'}
