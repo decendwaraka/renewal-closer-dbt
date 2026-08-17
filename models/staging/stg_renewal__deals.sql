@@ -2,8 +2,17 @@
 -- Deal owner is the top-level OWNER_ID (NOT property_hubspot_owner_id).
 -- Fivetran collapses HubSpot triple underscores (upsell___close_date -> PROPERTY_UPSELL_CLOSE_DATE).
 --
--- Cash total is base + AP1 + AP2 + AP3 + AP4 (confirmed 2026-08-06: only 4 additional payments are
--- ever allowed; AP5-AP10 properties are unused placeholders, not a sync gap — see OPEN_ISSUES Resolved #1).
+-- Cash total is base + AP1 + AP2 + AP3 + AP4, now extended with AP11/AP12 (OPEN_ISSUES #34, Celeste
+-- 2026-08-16/17): confirmed 2026-08-06 that AP5-AP10 are unused placeholders, not a sync gap -- see
+-- OPEN_ISSUES Resolved #1. AP11/AP12 are different: live-checked directly in HubSpot, both
+-- collected_amount__additional_payment_11/12 and collected_date_additional_payment_11/12 exist as real
+-- properties, but zero deals have ever had a value in any of the four (confirmed two independent ways --
+-- HubSpot search + SQL COUNT, cross-validated against a property known to have exactly 2 populated
+-- deals to rule out a false-zero). Fivetran hasn't added the columns yet, presumably because it's never
+-- seen a non-null value to sync. Wired in via safe_source_column (see macros/safe_source_column.sql),
+-- which checks the live source schema on every run and falls back to NULL if the column isn't there yet
+-- -- so this activates with real numbers automatically the moment Fivetran catches up, no further code
+-- change needed.
 -- OPEN ISSUE #2 (product field): renewal_product is dead; upsell_plan is the live product field.
 
 WITH source AS (
@@ -38,6 +47,14 @@ renamed AS (
         property_collected_date_additional_payment_3                AS ap3_stamped_at,
         property_collected_amount_additional_payment_4              AS ap4_amount,
         property_collected_date_additional_payment_4                AS ap4_stamped_at,
+        {{ safe_source_column('hubspot_raw', 'DEAL', 'property_collected_amount_additional_payment_11', 'FLOAT') }}
+                                                                     AS ap11_amount,
+        {{ safe_source_column('hubspot_raw', 'DEAL', 'property_collected_date_additional_payment_11', 'TIMESTAMP_NTZ') }}
+                                                                     AS ap11_stamped_at,
+        {{ safe_source_column('hubspot_raw', 'DEAL', 'property_collected_amount_additional_payment_12', 'FLOAT') }}
+                                                                     AS ap12_amount,
+        {{ safe_source_column('hubspot_raw', 'DEAL', 'property_collected_date_additional_payment_12', 'TIMESTAMP_NTZ') }}
+                                                                     AS ap12_stamped_at,
 
         -- product / term attributes (for Cash-by-Pipeline split, pending mapping)
         property_renewal_year_count                                 AS renewal_year_count,
