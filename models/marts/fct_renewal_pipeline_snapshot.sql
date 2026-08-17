@@ -58,9 +58,18 @@
 -- "Drives Membership Expiring Soon tag" -- but live-checked 2026-08-15 at 28/6064 and 12/6064 populated
 -- on renewal-pipeline deals, a dead end).
 --
--- PC Due WINDOW WIDTH -- PROVISIONAL (2026-08-15), symmetric +/-45 days around the midpoint. Celeste
--- never specified a width, so this was derived from live data rather than guessed, and should be
--- swapped if she answers differently. How it was derived, in case it needs re-checking:
+-- Start-date fallback extended to a 3rd tier (Celeste, 2026-08-16): COALESCE(upsell___close_date,
+-- closedate, contact.true_renewal_close_date). Celeste's answer named the contact property as THE source,
+-- but live-checked, it only covers 34% of in-scope deals standalone -- worse than the existing deal-level
+-- COALESCE's 60%. It does rescue 350 deals the deal-level fields miss entirely (little overlap), so it's
+-- appended as a third fallback rather than swapped in as a replacement -- pushes coverage to ~65.5%
+-- (3,945/6,024). See stg_renewal__deal_contacts.sql for the contact-side join.
+--
+-- PC Due WINDOW -- CONFIRMED (Celeste, 2026-08-16): due starting 15 days before the midpoint, staying due
+-- until the deal stage shifts to PC Invited -- no fixed upper bound. This replaces the provisional
+-- symmetric +/-45d window below (kept for the record of how the width was estimated before her answer
+-- arrived, since her rule is a strictly better mechanism -- "stays due" is enforced for free by this
+-- model's stage-based bucketing, not a second date bound to maintain):
 --   * The OLD pipeline has real Due stages, and RAW.DEAL carries per-stage DATE_ENTERED_<id>/
 --     DATE_EXITED_<id>. Stage EXIT is the signal (when the team acted); stage ENTRY is useless here --
 --     PC Due entry has a median of 0 days from the start date, i.e. Due is just the default landing
@@ -68,14 +77,11 @@
 --   * Method validated by a control: running it on RC Due (whose 45-day rule we already know) returned
 --     a median of 44 days before expiration. Near-exact recovery, so the extraction is trustworthy.
 --   * PC Due exits (n=984 in-term deals) cluster just BEFORE the midpoint: p25 5 / median 21 / p75 37
---     days before it. Share of real work captured -- symmetric +/-45d: 69.0%; 45d before only: 58.0%;
---     30d before only: 48.5%; "due once past midpoint, stays due": 21.3%.
---   * So +/-45 wins on coverage AND matches rc_due's existing 45-day magnitude. The "stays due after
---     midpoint" variant is ruled out: 78.7% of progress calls are worked BEFORE the midpoint, so it
---     would flag deals as due only after the team had already worked them.
---   * Caveats: measured on the OLD pipeline (the new one has no Due stage -- the reason this is computed
---     at all), assumes the new pipeline behaves the same, and the in-term restriction dropped 984 of
---     1543 PC exits.
+--     days before it -- worth flagging back to Celeste that a 15-day-before start is later than when the
+--     team is actually shown to act (median 21 days before), but her rule is authoritative regardless.
+--   * Caveats on the historical distribution above: measured on the OLD pipeline (the new one has no Due
+--     stage -- the reason this is computed at all), assumes the new pipeline behaves the same, and the
+--     in-term restriction dropped 984 of 1543 PC exits.
 --
 -- Test-contact exclusion (Sub-task 3, 2026-08-13): deals linked to a HubSpot contact with Lead Status
 -- "Internal Test Record" are excluded here at the base deal grain, so it covers every snapshot_col
@@ -90,33 +96,45 @@ WITH deals AS (
         d.membership_expiration_date,
         d.close_date,
         d.close_date_fallback,
+        tc.contact_true_renewal_close_date,
         d.date_entered_current_stage
     FROM {{ ref('stg_renewal__deals') }} AS d
     LEFT JOIN {{ ref('stg_renewal__deal_contacts') }} AS tc ON d.deal_id = tc.deal_id
     WHERE COALESCE(tc.is_test_contact, FALSE) = FALSE
 ),
 
--- PC Due midpoint (Travis/Celeste, 2026-08-15) -- see the pc_due comment block above. Consumed by
--- pc_due_computed further down.
+-- PC Due midpoint (Travis/Celeste, 2026-08-15; 3rd fallback tier added 2026-08-16) -- see the pc_due
+-- comment block above. Consumed by pc_due_computed further down. contact_true_renewal_close_date is a
+-- real timestamp (not a midnight-anchored HubSpot date property), same convention as close_date_fallback,
+-- so it uses to_et_date, not hubspot_date_to_et_date.
 pc_due_midpoint AS (
     SELECT
         d.deal_id,
         COALESCE(
             {{ hubspot_date_to_et_date('d.close_date') }},
-            {{ to_et_date('d.close_date_fallback') }}
+            {{ to_et_date('d.close_date_fallback') }},
+            {{ to_et_date('d.contact_true_renewal_close_date') }}
         ) AS membership_start_date_et,
         {{ hubspot_date_to_et_date('d.membership_expiration_date') }} AS membership_expiration_date_et,
         DATEADD(
             'day',
             FLOOR(DATEDIFF(
                 'day',
-                COALESCE({{ hubspot_date_to_et_date('d.close_date') }}, {{ to_et_date('d.close_date_fallback') }}),
+                COALESCE(
+                    {{ hubspot_date_to_et_date('d.close_date') }},
+                    {{ to_et_date('d.close_date_fallback') }},
+                    {{ to_et_date('d.contact_true_renewal_close_date') }}
+                ),
                 {{ hubspot_date_to_et_date('d.membership_expiration_date') }}
             ) / 2),
-            COALESCE({{ hubspot_date_to_et_date('d.close_date') }}, {{ to_et_date('d.close_date_fallback') }})
+            COALESCE(
+                {{ hubspot_date_to_et_date('d.close_date') }},
+                {{ to_et_date('d.close_date_fallback') }},
+                {{ to_et_date('d.contact_true_renewal_close_date') }}
+            )
         ) AS pc_due_midpoint_et
     FROM deals AS d
-    WHERE COALESCE(d.close_date, d.close_date_fallback) IS NOT NULL
+    WHERE COALESCE(d.close_date, d.close_date_fallback, d.contact_true_renewal_close_date) IS NOT NULL
       AND d.membership_expiration_date IS NOT NULL
 ),
 
@@ -169,9 +187,13 @@ new_pipeline_pre_pc_stages AS (
       AND snapshot_col = 'new_member'
 ),
 
--- PROVISIONAL window -- see the PC Due WINDOW WIDTH block at the top of this file before changing 45.
--- rc_due wins ties: a deal inside BOTH windows (past its midpoint AND within 45 days of expiration) is
--- the later, more urgent state, so it's excluded here rather than double-bucketed.
+-- CONFIRMED window (Celeste, 2026-08-16) -- see the PC Due WINDOW block at the top of this file. Due
+-- starts 15 days before the midpoint, with NO upper date bound -- "stays due until PC Invited" is already
+-- enforced by this CTE only matching deals whose CURRENT stage is still new_member (new_pipeline_pre_pc_
+-- stages); once a deal's stage actually moves to pc_invited or later, it stops matching here by
+-- construction and picks up its own bucket via stage_based below. rc_due wins ties: a deal inside BOTH
+-- windows (past its own -15d start AND within 45 days of expiration) is the later, more urgent state, so
+-- it's excluded here rather than double-bucketed.
 pc_due_computed AS (
     SELECT
         d.deal_id,
@@ -180,9 +202,9 @@ pc_due_computed AS (
         d.pipeline_id,
         'progress_call' AS stage_group,
         'pc_due'        AS snapshot_col,
-        -- Mirrors rc_due: the deal "enters" pc_due when the window opens (45 days before the midpoint),
+        -- Mirrors rc_due: the deal "enters" pc_due when the window opens (15 days before the midpoint),
         -- not on whatever day the dashboard is loaded, so windowed queries see it on the real date.
-        DATEADD('day', -45, m.pc_due_midpoint_et) AS entry_date_et
+        DATEADD('day', -15, m.pc_due_midpoint_et) AS entry_date_et
     FROM deals AS d
     INNER JOIN new_pipeline_pre_pc_stages AS e ON d.dealstage_id = e.stage_id
     INNER JOIN closers AS cl ON d.closer_owner_id = cl.owner_id
@@ -190,8 +212,7 @@ pc_due_computed AS (
     WHERE d.pipeline_id = '{{ var("new_renewal_pipeline_id") }}'
       AND d.deal_id NOT IN (SELECT deal_id FROM rc_due_computed)
       AND DATE(CONVERT_TIMEZONE('America/New_York', CURRENT_TIMESTAMP()))
-          BETWEEN DATEADD('day', -45, m.pc_due_midpoint_et)
-              AND DATEADD('day',  45, m.pc_due_midpoint_et)
+          >= DATEADD('day', -15, m.pc_due_midpoint_et)
 ),
 
 -- Deals re-bucketed into rc_due_computed or pc_due_computed are excluded here so each deal lands in

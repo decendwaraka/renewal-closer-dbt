@@ -69,14 +69,10 @@ unit_tests:
       - input: ref('dim_closers')
         rows:
           - {owner_id: '82672208', closer_name: 'Sufijan Cunningham'}
-      - input: source('hubspot_raw', 'DEAL_CONTACT')
-        rows: []
-      - input: ref('stg_renewal__contact_webinar_bookings')
-        rows: []
     expect:
       rows:
-        - {deal_id: 1, closer_owner_id: '82672208', pipeline_id: '917643668', dealstage_id: '1401758776', close_date_et: "2026-08-01", cash_collected: 12000}
-        - {deal_id: 2, closer_owner_id: '82672208', pipeline_id: '95211801', dealstage_id: '175346331', close_date_et: "2026-08-01", cash_collected: 5000}
+        - {deal_id: 1, closer_owner_id: '82672208', pipeline_id: '917643668', dealstage_id: '1401758776', close_date_et: "2026-08-01", cash_collected: 12000, is_post_webinar_close: false}
+        - {deal_id: 2, closer_owner_id: '82672208', pipeline_id: '95211801', dealstage_id: '175346331', close_date_et: "2026-08-01", cash_collected: 5000, is_post_webinar_close: false}
 
   - name: test_won_deals_excludes_non_won_stage_and_non_closer
     description: "A renewal-pipeline deal not on a won stage, and a deal owned outside dim_closers, are both excluded."
@@ -89,9 +85,23 @@ unit_tests:
       - input: ref('dim_closers')
         rows:
           - {owner_id: '82672208', closer_name: 'Sufijan Cunningham'}
-      - input: source('hubspot_raw', 'DEAL_CONTACT')
-        rows: []
-      - input: ref('stg_renewal__contact_webinar_bookings')
-        rows: []
     expect:
       rows: []
+
+  - name: test_won_deals_post_webinar_attribution_from_deal_property
+    description: "is_post_webinar_close (OPEN_ISSUES #33) reads directly off the deal's own renewal_traffic_source property -- 'Webinar' flags true, blank/any other value flags false, no contact join involved (Celeste's deal-level property, 2026-08-16, supersedes the retired interim contact-parsing method)."
+    model: int_renewal__won_deals
+    given:
+      - input: ref('stg_renewal__deals')
+        rows:
+          - {deal_id: 1, closer_owner_id: '82672208', pipeline_id: '95211801', dealstage_id: '175346331', close_date: "2026-08-01", cash_collected: 5000, renewal_traffic_source: 'Webinar'}
+          - {deal_id: 2, closer_owner_id: '82672208', pipeline_id: '95211801', dealstage_id: '175346331', close_date: "2026-08-01", cash_collected: 5000, renewal_traffic_source: ''}
+          - {deal_id: 3, closer_owner_id: '82672208', pipeline_id: '95211801', dealstage_id: '175346331', close_date: "2026-08-01", cash_collected: 5000, renewal_traffic_source: null}
+      - input: ref('dim_closers')
+        rows:
+          - {owner_id: '82672208', closer_name: 'Sufijan Cunningham'}
+    expect:
+      rows:
+        - {deal_id: 1, closer_owner_id: '82672208', pipeline_id: '95211801', dealstage_id: '175346331', close_date_et: "2026-08-01", cash_collected: 5000, is_post_webinar_close: true}
+        - {deal_id: 2, closer_owner_id: '82672208', pipeline_id: '95211801', dealstage_id: '175346331', close_date_et: "2026-08-01", cash_collected: 5000, is_post_webinar_close: false}
+        - {deal_id: 3, closer_owner_id: '82672208', pipeline_id: '95211801', dealstage_id: '175346331', close_date_et: "2026-08-01", cash_collected: 5000, is_post_webinar_close: false}
