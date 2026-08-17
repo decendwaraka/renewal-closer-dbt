@@ -2,6 +2,11 @@
 -- Base filters (spec): renewal pipelines + won stages + closer owner + close date field.
 -- Also includes Win-Back pipeline deals on its own closed-won stage (OPEN_ISSUES #12) -- Win-Back
 -- was previously excluded entirely (deliberate v1 scope decision), now folded into cash/won-deal totals.
+--
+-- is_post_webinar_close (OPEN_ISSUES #33) now reads directly off the deal's own renewal_traffic_source
+-- property -- no DEAL_CONTACT/CONTACT join needed anymore, since Celeste's interim contact-property-parsing
+-- ask (stg_renewal__contact_webinar_bookings) is superseded by her deal-level property, per her 2026-08-16
+-- answer.
 
 WITH deals AS (
     SELECT * FROM {{ ref('stg_renewal__deals') }}
@@ -31,7 +36,13 @@ won AS (
         d.orig_product_category,
         d.upsell_plan,
         d.renewal_product_pitched,
-        d.active_product_snapshot_at_won
+        d.active_product_snapshot_at_won,
+        -- Post-Webinar attribution (OPEN_ISSUES #33, Celeste 2026-08-16): deal's own renewal_traffic_source
+        -- dropdown, blank for every deal except ones sourced from a renewal webinar. Replaces the interim
+        -- contact-property-parsing method (stg_renewal__contact_webinar_bookings) -- live-checked, the two
+        -- methods barely overlap (25 deals in common out of 194 new / 41 old), so this is a real swap, not
+        -- a simplification of an equivalent rule.
+        COALESCE(d.renewal_traffic_source = 'Webinar', FALSE) AS is_post_webinar_close
     FROM deals AS d
     INNER JOIN closers AS c ON d.closer_owner_id = c.owner_id
     WHERE (
@@ -41,30 +52,6 @@ won AS (
         d.pipeline_id = '{{ var('winback_pipeline_id') }}'
         AND d.dealstage_id IN ({{ "'" ~ var('winback_won_stage_ids') | join("','") ~ "'" }})
     )
-),
-
--- Post-Webinar attribution (OPEN_ISSUES #33): a deal counts as post-webinar-attributed if any
--- associated contact booked a post-renewal-webinar call within 30 days before/on the close date.
-deal_contact AS (
-    SELECT deal_id, contact_id
-    FROM {{ source('hubspot_raw', 'DEAL_CONTACT') }}
-),
-
-post_webinar_flag AS (
-    SELECT
-        dc.deal_id,
-        BOOLOR_AGG(
-            pwb.booked_at_et BETWEEN DATEADD('day', -30, w.close_date_et) AND w.close_date_et
-        ) AS is_post_webinar_close
-    FROM won AS w
-    INNER JOIN deal_contact AS dc ON w.deal_id = dc.deal_id
-    LEFT JOIN {{ ref('stg_renewal__contact_webinar_bookings') }} AS pwb
-        ON pwb.contact_id = dc.contact_id::VARCHAR
-    GROUP BY dc.deal_id
 )
 
-SELECT
-    w.*,
-    COALESCE(pwf.is_post_webinar_close, FALSE) AS is_post_webinar_close
-FROM won AS w
-LEFT JOIN post_webinar_flag AS pwf ON w.deal_id = pwf.deal_id
+SELECT * FROM won

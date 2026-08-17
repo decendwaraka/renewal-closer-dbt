@@ -49,6 +49,13 @@ renamed AS (
         -- Won, distinct from upsell_plan (what they're renewing into). Auto-filled via HubSpot workflow.
         property_active_product_snapshot_at_won                     AS active_product_snapshot_at_won,
 
+        -- Post-Webinar attribution (OPEN_ISSUES #33, Celeste 2026-08-16): deal-level dropdown, blank for
+        -- every deal except ones sourced from a renewal webinar. Replaces the interim contact-property-
+        -- parsing method (stg_renewal__contact_webinar_bookings) -- live-checked, this property tags 194
+        -- deals today vs. 41 under the old interim rule, with only 25 deals overlapping between the two,
+        -- so the swap materially changes (and improves) attribution, not just simplifies it.
+        property_renewal_traffic_source                             AS renewal_traffic_source,
+
         -- Stage-entry timestamps (PC/RC Book% cohort formula): HubSpot auto-stamps a per-stage
         -- "date entered" property, keyed by stage_id, onto the deal. Picked by the deal's CURRENT
         -- pipeline (95211801 old / 898243912 new), not COALESCE(old, new) -- COALESCE silently prefers

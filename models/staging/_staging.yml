@@ -20,13 +20,7 @@ models:
         tests: [unique, not_null]
 
   - name: stg_renewal__deal_contacts
-    description: "One row per deal with an associated contact, flagging deals linked to an Internal Test contact for exclusion from pipeline totals (Sub-task 3, 2026-08-13)."
+    description: "One row per deal with an associated contact: flags deals linked to an Internal Test contact for exclusion from pipeline totals (Sub-task 3, 2026-08-13), and carries the contact-level true_renewal_close_date PC Due fallback (OPEN_ISSUES #24, 2026-08-16)."
     columns:
       - name: deal_id
-        tests: [unique, not_null]
-
-  - name: stg_renewal__contact_webinar_bookings
-    description: "One row per contact with a parsed post-renewal-webinar booking date, from the renewal_webinars__booked property value (interim Post-Webinar attribution, OPEN_ISSUES #33)."
-    columns:
-      - name: contact_id
         tests: [unique, not_null]
