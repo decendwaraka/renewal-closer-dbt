@@ -6,8 +6,14 @@
 -- exposes per-deal dated rows so any date window (MTD, prior-MTD, etc.) can be applied downstream,
 -- consistent with fct_renewal_cash exposing cash_date_et per row rather than pre-aggregating.
 --
--- Book% formula (per stakeholder): (deals entered Invited this month so far) / (deals entered Scheduled
--- this month so far), computed the same way for PC and RC against their respective stage pairs.
+-- Book% formula (Celeste, in-app comment on metric tile #13, 2026-08-13): "any deal who entered
+-- PC/Midway invited stage this month so far VS any deal who entered PC/Midway Scheduled this month."
+-- (deals entered Invited this month so far) / (deals entered Scheduled this month so far), computed
+-- the same way for PC and RC against their respective stage pairs. Two INDEPENDENT tallies, not a
+-- deal-linked cohort -- built and confirmed to her exactly as stated on 2026-08-14. This is also why
+-- Book% can mathematically exceed 100% (OPEN_ISSUES #41): a deal entering Scheduled without ever
+-- entering Invited in the same window (or vice versa) has nothing on the other side of the ratio.
+-- That's an accepted consequence of her stated rule, not an open formula question.
 --
 -- As of 2026-08-17 this also backs the Call Outcomes Invited/Booked columns themselves, not just the
 -- Book% ratio. Those columns previously read fct_renewal_pipeline_snapshot -- a CURRENT-stage bucket,
