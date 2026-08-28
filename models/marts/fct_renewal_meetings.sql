@@ -16,6 +16,7 @@ final AS (
         m.closer_owner_id,
         cl.closer_name,
         m.activity_type,
+        m.activity_type_key,
         m.meeting_category,
         m.meeting_outcome,
         m.meeting_date_et,

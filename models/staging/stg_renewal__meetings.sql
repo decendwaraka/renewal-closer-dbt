@@ -1,6 +1,10 @@
 -- Renewal meetings staging. Column names verified against MARKETING_DB.RAW.ENGAGEMENT_MEETING.
 -- Meeting owner is PROPERTY_HUBSPOT_OWNER_ID (differs from deals, which use OWNER_ID).
 -- Meeting date field is PROPERTY_HS_MEETING_START_TIME (verified present; use this, not hs_timestamp).
+--
+-- activity_type is passed through RAW. Case/whitespace normalization happens in int_renewal__meetings,
+-- which is also where categorization lives -- keeping the two together means the unit tests can feed a
+-- raw HubSpot string and actually exercise the normalization.
 
 WITH source AS (
     SELECT * FROM {{ source('hubspot_raw', 'ENGAGEMENT_MEETING') }}
