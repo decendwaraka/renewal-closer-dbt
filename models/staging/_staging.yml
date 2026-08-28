@@ -15,6 +15,22 @@ models:
       - name: activity_type
         description: "Raw HubSpot hs_activity_type, passed through unmodified. Downstream categorization normalizes it (case + whitespace) in int_renewal__meetings — HubSpot allows the same type under multiple casings (`Renewal Follow-Up` vs `Renewal Follow-up`, 2026-08-24), so never match this raw."
 
+  - name: stg_renewal__contact_invites
+    description: "One row per (contact_id, invite_flow, invite_tier, invited_date_et), unpivoted from the six HubSpot CONTACT invite date properties behind Celeste's True Booking Rate report. Contact grain -- this is the basis Call Outcomes Invited/Book% moved to on 2026-08-28."
+    columns:
+      - name: contact_id
+        tests: [not_null]
+      - name: invited_date_et
+        tests: [not_null]
+
+  - name: stg_renewal__meeting_contacts
+    description: "One row per (contact_id, meeting_id) for renewal-type meetings, dated by hs_createdate (when the member booked). The booked side of the contact cohort. Deliberately NOT built on int_renewal__meetings, which restricts to closer-owned meetings -- her report puts no condition on the meeting owner."
+    columns:
+      - name: contact_id
+        tests: [not_null]
+      - name: booked_date_et
+        tests: [not_null]
+
   - name: stg_renewal__meeting_deals
     description: "One row per meeting engagement with its associated deal_id (deduped to one deal per meeting), for first-call-per-deal dedup (OPEN_ISSUES #23)."
     columns:

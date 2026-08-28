@@ -43,7 +43,14 @@ models:
         tests: [not_null]
 
   - name: fct_renewal_stage_entries
-    description: "Deal-grain fact: one row per (deal_id, stage_entry_type, entry_date_et) for PC/RC Invited/Scheduled stage-entry dates, across both renewal pipelines. Feeds the cohort-based PC/RC Book% formula (entered Invited this month / entered Scheduled this month). Not pre-aggregated -- apply date windows downstream."
+    description: >
+      DEPRECATED 2026-08-28 -- superseded by fct_renewal_contact_invites + fct_renewal_contact_bookings.
+      Deal-grain fact: one row per (deal_id, stage_entry_type, entry_date_et) for PC/RC Invited/Scheduled
+      stage-entry dates, across both renewal pipelines. Backed Call Outcomes Invited/Booked/Book% until
+      Celeste's "match the HubSpot report" decision moved all three to the contact basis; her report was
+      never built on deal stages. Kept rather than dropped: nothing in dbt depends on it, it is a view so
+      it costs nothing, and given the OPEN_ISSUES #41 / #47 history someone will want to compare the two
+      bases. No new consumers.
     columns:
       - name: deal_id
         tests: [not_null]
@@ -52,6 +59,54 @@ models:
           - not_null
           - accepted_values:
               values: ['pc_invited', 'pc_scheduled', 'rc_invited', 'rc_scheduled']
+
+  - name: fct_renewal_contact_invites
+    description: >
+      Contact-grain invited cohort: one row per (contact_id, invite_flow, invite_tier, invited_date_et)
+      from the six HubSpot CONTACT invite date properties Celeste's "True Booking Rate" report ORs
+      together. Denominator of Book% and the source of the Invited column. Per tier, not collapsed per
+      flow, so a contact invited on different properties in different months belongs to both windows --
+      always count COUNT(DISTINCT contact_id). Not scoped to dim_closers; the reporting layer joins it.
+    columns:
+      - name: contact_id
+        tests: [not_null]
+      - name: invite_flow
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['PC', 'RC']
+      - name: invite_tier
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['MM', 'ACC', '2YR']
+      - name: invited_date_et
+        tests: [not_null]
+
+  - name: fct_renewal_contact_bookings
+    description: >
+      Contact-grain booked cohort: one row per (contact_id, meeting_id) for every renewal-type meeting,
+      dated by when the meeting RECORD was created (hs_createdate) -- when the member booked, not when the
+      call happens. Numerator of Book%. Joined to fct_renewal_contact_invites on contact_id with the date
+      window applied to BOTH sides independently, which is what her report does. Not restricted to the
+      invited flow and carries no meeting-outcome filter, again matching her report.
+    columns:
+      - name: contact_id
+        tests: [not_null]
+      - name: meeting_id
+        tests: [not_null]
+      - name: booked_date_et
+        tests: [not_null]
+      - name: activity_type_key
+        description: "LOWER(TRIM(activity_type)). Kept so a re-cased HubSpot duplicate can be spotted here without re-reading RAW."
+        tests:
+          - accepted_values:
+              values: [
+                'renewal 3 month', 'renewal accelerator 3 month',
+                'renewal strategy', 'renewal strategy alignment',
+                'renewal accelerator', 'renewal follow-up',
+                'renewal post webinar call',
+              ]
 
   - name: rpt_renewal_closer_dashboard
     description: "Per-closer MTD / prior-MTD / goal reporting table feeding the dashboard."
