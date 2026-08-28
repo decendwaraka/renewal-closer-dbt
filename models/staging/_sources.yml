@@ -21,5 +21,12 @@ sources:
         description: "Owner id -> name mapping."
       - name: DEAL_CONTACT
         description: "Deal-to-contact association (Fivetran). Used for test-contact exclusion (Sub-task 3, 2026-08-13) -- almost every deal has exactly one associated contact, a handful have two."
+      - name: ENGAGEMENT_CONTACT
+        description: "Meeting-to-contact association (engagement_id -> contact_id). Backs the contact-grain booked side of Call Outcomes (stg_renewal__meeting_contacts, 2026-08-28). Note it has no _fivetran_deleted column, unlike most Fivetran tables here -- soft-delete filtering happens on the meeting side."
       - name: CONTACT
-        description: "HubSpot contacts. hs_lead_status used to identify and exclude Internal Test contacts' deals from pipeline totals."
+        description: >
+          HubSpot contacts. Two uses: hs_lead_status identifies and excludes Internal Test contacts, and
+          the six invite date properties (midway_call_invited / renewal_call_invited, each x MM / _acc /
+          _2yr) are the invited cohort behind Call Outcomes Invited and Book% as of 2026-08-28 --
+          Celeste's live "True Booking Rate" report is built on these, not on deal stages. See
+          stg_renewal__contact_invites.sql.
