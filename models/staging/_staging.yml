@@ -12,6 +12,8 @@ models:
     columns:
       - name: meeting_id
         tests: [unique, not_null]
+      - name: activity_type
+        description: "Raw HubSpot hs_activity_type, passed through unmodified. Downstream categorization normalizes it (case + whitespace) in int_renewal__meetings — HubSpot allows the same type under multiple casings (`Renewal Follow-Up` vs `Renewal Follow-up`, 2026-08-24), so never match this raw."
 
   - name: stg_renewal__meeting_deals
     description: "One row per meeting engagement with its associated deal_id (deduped to one deal per meeting), for first-call-per-deal dedup (OPEN_ISSUES #23)."
