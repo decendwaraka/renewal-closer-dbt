@@ -2,16 +2,11 @@
 -- Each component is dated by its own date field so date-range filters bucket it correctly.
 -- Pattern mirrors setter-dbt/models/marts/fct_ob_cash.sql (UNION-ALL per payment).
 --
--- Cash total is base + AP1 + AP2 + AP3 + AP4, now extended with AP11 + AP12 (all dated). Confirmed
--- 2026-08-06: AP5-AP10 are unused placeholders, not a missing sync — see OPEN_ISSUES Resolved #1.
---
--- AP11/AP12 (OPEN_ISSUES #34, Celeste 2026-08-16/17): wired the same way as AP1-4, sourced via
--- safe_source_column upstream in stg_renewal__deals.sql -- live-checked directly in HubSpot, both
--- properties are real but zero deals have ever had a value in either (Fivetran hasn't synced the
--- columns, presumably because it's never seen a non-null value to sync). ap11_amount/ap12_amount will
--- read as NULL until Fivetran catches up, and the `WHERE amount_col > 0` filter below already drops
--- that -- so this activates with real numbers automatically once data starts flowing, no further code
--- change needed then.
+-- Cash total is base + AP1-AP12 (2026-09-01: AP5 was found live and populated -- $2,783.33 across 3
+-- deals -- see stg_renewal__deals.sql header for the full story). AP1-4 are guaranteed to exist;
+-- AP5-12 are wired via safe_source_column upstream and read as 0 (COALESCEd, never NULL) until
+-- Fivetran syncs that index's columns, so the `> 0` filter below naturally excludes them until then --
+-- no code change needed as each index goes live.
 
 {% set cash_components = [
     ('base', 'cash_collected', 'close_date_et'),
@@ -19,6 +14,12 @@
     ('ap2',  'ap2_amount',     hubspot_date_to_et_date('ap2_stamped_at')),
     ('ap3',  'ap3_amount',     hubspot_date_to_et_date('ap3_stamped_at')),
     ('ap4',  'ap4_amount',     hubspot_date_to_et_date('ap4_stamped_at')),
+    ('ap5',  'ap5_amount',     hubspot_date_to_et_date('ap5_stamped_at')),
+    ('ap6',  'ap6_amount',     hubspot_date_to_et_date('ap6_stamped_at')),
+    ('ap7',  'ap7_amount',     hubspot_date_to_et_date('ap7_stamped_at')),
+    ('ap8',  'ap8_amount',     hubspot_date_to_et_date('ap8_stamped_at')),
+    ('ap9',  'ap9_amount',     hubspot_date_to_et_date('ap9_stamped_at')),
+    ('ap10', 'ap10_amount',    hubspot_date_to_et_date('ap10_stamped_at')),
     ('ap11', 'ap11_amount',    hubspot_date_to_et_date('ap11_stamped_at')),
     ('ap12', 'ap12_amount',    hubspot_date_to_et_date('ap12_stamped_at')),
 ] %}

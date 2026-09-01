@@ -2,17 +2,17 @@
 -- Deal owner is the top-level OWNER_ID (NOT property_hubspot_owner_id).
 -- Fivetran collapses HubSpot triple underscores (upsell___close_date -> PROPERTY_UPSELL_CLOSE_DATE).
 --
--- Cash total is base + AP1 + AP2 + AP3 + AP4, now extended with AP11/AP12 (OPEN_ISSUES #34, Celeste
--- 2026-08-16/17): confirmed 2026-08-06 that AP5-AP10 are unused placeholders, not a sync gap -- see
--- OPEN_ISSUES Resolved #1. AP11/AP12 are different: live-checked directly in HubSpot, both
--- collected_amount__additional_payment_11/12 and collected_date_additional_payment_11/12 exist as real
--- properties, but zero deals have ever had a value in any of the four (confirmed two independent ways --
--- HubSpot search + SQL COUNT, cross-validated against a property known to have exactly 2 populated
--- deals to rule out a false-zero). Fivetran hasn't added the columns yet, presumably because it's never
--- seen a non-null value to sync. Wired in via safe_source_column (see macros/safe_source_column.sql),
--- which checks the live source schema on every run and falls back to NULL if the column isn't there yet
--- -- so this activates with real numbers automatically the moment Fivetran catches up, no further code
--- change needed.
+-- Cash total is base + AP1-AP12 (2026-09-01: found AP5 had gone live and populated -- $2,783.33 across
+-- 3 deals, all missing from Elisabeth Rogers' August total -- while AP1-4/AP5-10/AP11-12 were being
+-- treated as one uniform "not populated yet" group. They're not uniform: Fivetran only creates a
+-- payment's collected_amount/date columns once at least one deal has a real value there, and each
+-- index goes live independently as reps actually collect that many installments. AP1-4 are wired
+-- directly (guaranteed to exist). AP5-12 are wired via safe_source_column (see
+-- macros/safe_source_column.sql), which checks the live source schema on every run and falls back to
+-- NULL if the column isn't there yet -- so each one activates with real numbers automatically the
+-- moment Fivetran adds it, no further code change needed. Amounts are COALESCEd to 0 (never NULL) so
+-- an unsynced or blank payment is inert in any SUM, not just the `> 0` filtered union in
+-- int_renewal__deal_cash.
 -- OPEN ISSUE #2 (product field): renewal_product is dead; upsell_plan is the live product field.
 
 WITH source AS (
@@ -37,21 +37,45 @@ renamed AS (
         -- not hubspot_date_to_et_date.
         property_closedate                                          AS close_date_fallback,
 
-        -- cash components (base + AP1 + AP2 + AP3 + AP4 available today)
+        -- cash components (base + AP1-AP12, see header note)
         property_cash_collected                                     AS cash_collected,
-        property_additional_payment_1_amount                        AS ap1_amount,
+        COALESCE(property_additional_payment_1_amount, 0)          AS ap1_amount,
         property_additional_payment_1_stamped_date                  AS ap1_stamped_at,
-        property_additional_payment_2_amount                        AS ap2_amount,
+        COALESCE(property_additional_payment_2_amount, 0)           AS ap2_amount,
         property_additional_payment_2_stamped_date                  AS ap2_stamped_at,
-        property_collected_amount_additional_payment_3              AS ap3_amount,
+        COALESCE(property_collected_amount_additional_payment_3, 0) AS ap3_amount,
         property_collected_date_additional_payment_3                AS ap3_stamped_at,
-        property_collected_amount_additional_payment_4              AS ap4_amount,
+        COALESCE(property_collected_amount_additional_payment_4, 0) AS ap4_amount,
         property_collected_date_additional_payment_4                AS ap4_stamped_at,
-        {{ safe_source_column('hubspot_raw', 'DEAL', 'property_collected_amount_additional_payment_11', 'FLOAT') }}
+        COALESCE({{ safe_source_column('hubspot_raw', 'DEAL', 'property_collected_amount_additional_payment_5', 'FLOAT') }}, 0)
+                                                                     AS ap5_amount,
+        {{ safe_source_column('hubspot_raw', 'DEAL', 'property_collected_date_additional_payment_5', 'TIMESTAMP_NTZ') }}
+                                                                     AS ap5_stamped_at,
+        COALESCE({{ safe_source_column('hubspot_raw', 'DEAL', 'property_collected_amount_additional_payment_6', 'FLOAT') }}, 0)
+                                                                     AS ap6_amount,
+        {{ safe_source_column('hubspot_raw', 'DEAL', 'property_collected_date_additional_payment_6', 'TIMESTAMP_NTZ') }}
+                                                                     AS ap6_stamped_at,
+        COALESCE({{ safe_source_column('hubspot_raw', 'DEAL', 'property_collected_amount_additional_payment_7', 'FLOAT') }}, 0)
+                                                                     AS ap7_amount,
+        {{ safe_source_column('hubspot_raw', 'DEAL', 'property_collected_date_additional_payment_7', 'TIMESTAMP_NTZ') }}
+                                                                     AS ap7_stamped_at,
+        COALESCE({{ safe_source_column('hubspot_raw', 'DEAL', 'property_collected_amount_additional_payment_8', 'FLOAT') }}, 0)
+                                                                     AS ap8_amount,
+        {{ safe_source_column('hubspot_raw', 'DEAL', 'property_collected_date_additional_payment_8', 'TIMESTAMP_NTZ') }}
+                                                                     AS ap8_stamped_at,
+        COALESCE({{ safe_source_column('hubspot_raw', 'DEAL', 'property_collected_amount_additional_payment_9', 'FLOAT') }}, 0)
+                                                                     AS ap9_amount,
+        {{ safe_source_column('hubspot_raw', 'DEAL', 'property_collected_date_additional_payment_9', 'TIMESTAMP_NTZ') }}
+                                                                     AS ap9_stamped_at,
+        COALESCE({{ safe_source_column('hubspot_raw', 'DEAL', 'property_collected_amount_additional_payment_10', 'FLOAT') }}, 0)
+                                                                     AS ap10_amount,
+        {{ safe_source_column('hubspot_raw', 'DEAL', 'property_collected_date_additional_payment_10', 'TIMESTAMP_NTZ') }}
+                                                                     AS ap10_stamped_at,
+        COALESCE({{ safe_source_column('hubspot_raw', 'DEAL', 'property_collected_amount_additional_payment_11', 'FLOAT') }}, 0)
                                                                      AS ap11_amount,
         {{ safe_source_column('hubspot_raw', 'DEAL', 'property_collected_date_additional_payment_11', 'TIMESTAMP_NTZ') }}
                                                                      AS ap11_stamped_at,
-        {{ safe_source_column('hubspot_raw', 'DEAL', 'property_collected_amount_additional_payment_12', 'FLOAT') }}
+        COALESCE({{ safe_source_column('hubspot_raw', 'DEAL', 'property_collected_amount_additional_payment_12', 'FLOAT') }}, 0)
                                                                      AS ap12_amount,
         {{ safe_source_column('hubspot_raw', 'DEAL', 'property_collected_date_additional_payment_12', 'TIMESTAMP_NTZ') }}
                                                                      AS ap12_stamped_at,
