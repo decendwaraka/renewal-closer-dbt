@@ -21,6 +21,12 @@
 --     by the test_meetings_closing_call_flag_and_retired_activity_types unit test. SHARED_FILTERS listing
 --     it is a documentation error; fix the doc, not this CASE. (1 meeting, 2026-07-18.)
 -- Neither type has a meeting in August 2026, so no current window moves.
+--
+-- is_closing_call also drops a PWC from Close Rate credit when the same deal already has an
+-- earlier completed RC that same calendar month (Travis, live) -- the credit belongs to the RC,
+-- not a repeat count. See rc_month_anchor below; when the ordering can't be pinned down (no
+-- deal_id, no RC that month, or the PWC isn't the later one) both calls count, per the agreed
+-- fallback.
 
 WITH meetings AS (
     SELECT * FROM {{ ref('stg_renewal__meetings') }}
@@ -83,6 +89,23 @@ completed_ranked AS (
         ) = 1 AS is_first_call
     FROM filtered
     WHERE is_completed AND meeting_category IN ('RC', 'PWC', 'WB')
+),
+
+-- Travis's rule: a member's PWC in the same calendar month as an RC they already had shouldn't
+-- earn its own Close Rate credit -- that credit belongs to the earlier RC. Anchored on the
+-- earliest completed, non-follow-up RC per deal per month so a later PWC that month can be
+-- compared against it.
+rc_month_anchor AS (
+    SELECT
+        deal_id,
+        DATE_TRUNC('month', meeting_date_et) AS meeting_month,
+        MIN(meeting_start_at)                AS first_rc_start_at
+    FROM filtered
+    WHERE meeting_category = 'RC'
+      AND is_completed
+      AND COALESCE(activity_type_key, '') != 'renewal follow-up'
+      AND deal_id IS NOT NULL
+    GROUP BY deal_id, DATE_TRUNC('month', meeting_date_et)
 )
 
 SELECT
@@ -109,6 +132,19 @@ SELECT
         f.meeting_category IN ('RC', 'PWC', 'WB')
         AND f.is_completed
         AND COALESCE(f.activity_type_key, '') != 'renewal follow-up'
+        -- Deliberate fallback (Travis/Derek): only exclude a PWC when we can positively place it
+        -- after a same-deal, same-month RC. Any case we can't pin down that way -- no deal_id
+        -- (unlinked meeting), no RC that month, or the PWC isn't the later of the two -- counts
+        -- both calls rather than guessing which one to drop.
+        AND NOT (
+            f.meeting_category = 'PWC'
+            AND f.deal_id IS NOT NULL
+            AND rc.first_rc_start_at IS NOT NULL
+            AND f.meeting_start_at > rc.first_rc_start_at
+        )
     ) AS is_closing_call
 FROM filtered AS f
 LEFT JOIN completed_ranked AS cr ON f.meeting_id = cr.meeting_id
+LEFT JOIN rc_month_anchor AS rc
+    ON f.deal_id = rc.deal_id
+    AND DATE_TRUNC('month', f.meeting_date_et) = rc.meeting_month
