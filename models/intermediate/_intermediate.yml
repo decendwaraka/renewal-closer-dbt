@@ -6,7 +6,7 @@ models:
   - name: int_renewal__deal_cash
     description: "Cash exploded to (deal, component) grain, each dated by its own field. base+AP1+AP2 today (OPEN_ISSUES #1)."
   - name: int_renewal__meetings
-    description: "Renewal meetings categorized PC/RC/PWC with booked/completed flags, attributed to closers. is_first_call (OPEN_ISSUES #23) flags the first completed call per deal per category, for DPL/Close Rate dedup. is_closing_call flags completed RC/PWC/WB calls that count as a 'Closing call' on the Closing Calls Today card; completed Renewal Follow-up calls still categorize as RC but are excluded from is_closing_call (Celeste). Renewal Strategy Alignment and Renewal Accelerator Evergreen are retired and no longer map to any meeting_category (filtered out)."
+    description: "Renewal meetings categorized PC/RC/PWC with booked/completed flags, attributed to closers. is_first_call (OPEN_ISSUES #23) flags the first completed call per deal per category, for DPL/Close Rate dedup. is_closing_call flags completed RC/PWC/WB calls that count as a 'Closing call' on the Closing Calls Today card; completed Renewal Follow-up calls still categorize as RC but are excluded from is_closing_call (Celeste). Renewal Strategy Alignment and Renewal Accelerator Evergreen are retired and no longer map to any meeting_category (filtered out). is_closing_call also excludes a PWC when the same deal already has an earlier completed RC that same calendar month (Travis) -- the credit belongs to the RC. When that ordering can't be pinned down precisely (no deal_id, no RC that month, or the PWC isn't the later of the two), both calls count, per the agreed fallback."
 
 unit_tests:
   - name: test_meetings_first_call_dedup_per_deal_and_category
@@ -92,6 +92,55 @@ unit_tests:
         - {meeting_id: 21, meeting_category: 'RC', is_completed: true, is_closing_call: false}
         - {meeting_id: 22, meeting_category: 'RC', is_completed: true, is_closing_call: true}
         - {meeting_id: 23, meeting_category: 'PC', is_completed: true, is_closing_call: false}
+
+  - name: test_meetings_post_webinar_monthly_dedup_and_fallback
+    description: >
+      Travis's rule: a PWC loses its Close Rate credit only when the same deal already had an
+      earlier completed, non-follow-up RC that same calendar month -- credit belongs to the RC.
+      Deal 200: RC then a later PWC in August -- the PWC is excluded (is_closing_call false), the
+      RC still counts. Deal 201: PWC first, RC later that same month -- order matters, so the
+      earlier PWC still counts (both true). Deal 202: RC in July, PWC in August -- different
+      months, both count. Meeting 40 has no HubSpot deal association at all -- the fallback (count
+      both rather than guess) applies automatically since a PWC can only be excluded via a
+      same-deal match. Deal 203: RC then a later WB call that month -- WB is never targeted by
+      this exclusion (it's PWC-only), so both count.
+    model: int_renewal__meetings
+    given:
+      - input: ref('stg_renewal__meetings')
+        rows:
+          - {meeting_id: 30, owner_id: '82672208', activity_type: 'Renewal Strategy', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-08-01 10:00:00"}
+          - {meeting_id: 31, owner_id: '82672208', activity_type: 'Renewal Post Webinar Call', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-08-05 10:00:00"}
+          - {meeting_id: 32, owner_id: '82672208', activity_type: 'Renewal Post Webinar Call', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-08-01 10:00:00"}
+          - {meeting_id: 33, owner_id: '82672208', activity_type: 'Renewal Strategy', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-08-05 10:00:00"}
+          - {meeting_id: 34, owner_id: '82672208', activity_type: 'Renewal Strategy', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-07-01 10:00:00"}
+          - {meeting_id: 35, owner_id: '82672208', activity_type: 'Renewal Post Webinar Call', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-08-05 10:00:00"}
+          - {meeting_id: 40, owner_id: '82672208', activity_type: 'Renewal Post Webinar Call', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-08-05 10:00:00"}
+          - {meeting_id: 50, owner_id: '82672208', activity_type: 'Renewal Strategy', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-08-01 10:00:00"}
+          - {meeting_id: 51, owner_id: '82672208', activity_type: 'Renewal Winback Call', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-08-05 10:00:00"}
+      - input: ref('stg_renewal__meeting_deals')
+        rows:
+          - {meeting_id: 30, deal_id: 200}
+          - {meeting_id: 31, deal_id: 200}
+          - {meeting_id: 32, deal_id: 201}
+          - {meeting_id: 33, deal_id: 201}
+          - {meeting_id: 34, deal_id: 202}
+          - {meeting_id: 35, deal_id: 202}
+          - {meeting_id: 50, deal_id: 203}
+          - {meeting_id: 51, deal_id: 203}
+      - input: ref('dim_closers')
+        rows:
+          - {owner_id: '82672208', closer_name: 'Sufijan Cunningham'}
+    expect:
+      rows:
+        - {meeting_id: 30, deal_id: 200, meeting_category: 'RC', is_closing_call: true}
+        - {meeting_id: 31, deal_id: 200, meeting_category: 'PWC', is_closing_call: false}
+        - {meeting_id: 32, deal_id: 201, meeting_category: 'PWC', is_closing_call: true}
+        - {meeting_id: 33, deal_id: 201, meeting_category: 'RC', is_closing_call: true}
+        - {meeting_id: 34, deal_id: 202, meeting_category: 'RC', is_closing_call: true}
+        - {meeting_id: 35, deal_id: 202, meeting_category: 'PWC', is_closing_call: true}
+        - {meeting_id: 40, deal_id: null, meeting_category: 'PWC', is_closing_call: true}
+        - {meeting_id: 50, deal_id: 203, meeting_category: 'RC', is_closing_call: true}
+        - {meeting_id: 51, deal_id: 203, meeting_category: 'WB', is_closing_call: true}
 
   - name: test_won_deals_includes_winback_pipeline_on_won_stage
     description: "A Win-Back deal on its closed-won stage (1401758776) is now folded into renewal cash/won-deal totals alongside the two renewal pipelines (OPEN_ISSUES #12) -- previously excluded entirely (deliberate v1 scope decision, now reversed). A Win-Back deal NOT yet on the closed-won stage (still e.g. Winback Booked) stays excluded, same as a renewal deal not on a won stage."
