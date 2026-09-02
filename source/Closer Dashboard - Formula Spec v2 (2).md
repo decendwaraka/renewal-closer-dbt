@@ -63,10 +63,12 @@ This document specifies every formula for the Renewals Closer Dashboard. This is
 | Category | hs\_activity\_type Values |
 | :---- | :---- |
 | Progress Call (PC) | Renewal 3 Month, Renewal Accelerator 3 month |
-| Renewal Call (RC) | Renewal Strategy, Renewal Strategy Alignment, Renewal Accelerator, Renewal Accelerator Evergreen, Renewal Follow-up |
+| Renewal Call (RC) | Renewal Strategy, Renewal Accelerator, Renewal Accelerator Evergreen |
 | Post Webinar Call (PWC) | Renewal Post Webinar Call |
 
 **v2: Added Post Webinar Call (PWC) as a third meeting type category per Celeste. PWC is neither a midway/progress call nor a renewal/strategy call.**
+
+**2026-09-02 addendum: Renewal Strategy Alignment and Renewal Follow-up retired from RC (business confirmed) — removed from the RC types list above and from every formula below that references it.**
 
 **All meeting metrics use hs\_meeting\_outcome \= 'COMPLETED' for live/completed calls. Renewal team does not use sub-outcomes (QUALIFIED, NURTURE, DQ).**
 
@@ -169,7 +171,7 @@ Four competitive leaderboards showing MTD performance with goal tracking and mon
 | **Numerator Object** | DEAL |
 | **Numerator** | Count of deals: pipeline in (Renewal Sales Pipeline, Renewal Pipeline) \+ dealstage in won stages \+ Renewal \- Close Date in range |
 | **Denominator Object** | MEETING |
-| **Denominator** | Count of meetings: hs\_activity\_type in RC types \+ PWC type ('Renewal Strategy', 'Renewal Strategy Alignment', 'Renewal Accelerator', 'Renewal Accelerator Evergreen', 'Renewal Follow-up', 'Renewal Post Webinar Call') \+ hs\_meeting\_outcome \= 'COMPLETED' \+ hs\_meeting\_start\_time in range |
+| **Denominator** | Count of meetings: hs\_activity\_type in RC types \+ PWC type ('Renewal Strategy', 'Renewal Accelerator', 'Renewal Accelerator Evergreen', 'Renewal Post Webinar Call') \+ hs\_meeting\_outcome \= 'COMPLETED' \+ hs\_meeting\_start\_time in range |
 | **Denominator Owner** | hubspot\_owner\_id (on meeting) in (82672208 Sufijan Cunningham, 756332149 Abe Underwood, 82734543 Elisabeth Rogers, 756339074 Melissa Davis, 76930546 Henna Shakoor) |
 | **Formula** | Numerator / Denominator x 100 |
 | **Group By** | closer (hubspot\_owner\_id) |
@@ -198,7 +200,7 @@ Five cards showing real-time activity for the current day. v2: Live Calls split 
 | **Object** | MEETING |
 | **Metric** | Count of meetings |
 | **Date Field** | hs\_meeting\_start\_time \= today |
-| **Filter 1** | hs\_activity\_type in ('Renewal Strategy', 'Renewal Strategy Alignment', 'Renewal Accelerator', 'Renewal Accelerator Evergreen', 'Renewal Follow-up', 'Renewal Post Webinar Call') |
+| **Filter 1** | hs\_activity\_type in ('Renewal Strategy', 'Renewal Accelerator', 'Renewal Accelerator Evergreen', 'Renewal Post Webinar Call') |
 | **Filter 2** | hs\_meeting\_outcome \= 'COMPLETED' |
 | **Filter 3** | hubspot\_owner\_id in (82672208 Sufijan Cunningham, 756332149 Abe Underwood, 82734543 Elisabeth Rogers, 756339074 Melissa Davis, 76930546 Henna Shakoor) |
 | **Settings** | Decimals: 0 |
@@ -322,7 +324,7 @@ Five cards showing real-time activity for the current day. v2: Live Calls split 
 | **Object** | MEETING |
 | **Metric** | Count of meetings |
 | **Date Field** | hs\_meeting\_start\_time within date range |
-| **Filter 1** | hs\_activity\_type in ('Renewal Strategy', 'Renewal Strategy Alignment', 'Renewal Accelerator', 'Renewal Accelerator Evergreen', 'Renewal Follow-up') |
+| **Filter 1** | hs\_activity\_type in ('Renewal Strategy', 'Renewal Accelerator', 'Renewal Accelerator Evergreen') |
 | **Filter 2** | hubspot\_owner\_id in (82672208 Sufijan Cunningham, 756332149 Abe Underwood, 82734543 Elisabeth Rogers, 756339074 Melissa Davis, 76930546 Henna Shakoor) |
 | **Group By** | hubspot\_owner\_id |
 | **Settings** | Decimals: 0 |
@@ -334,7 +336,7 @@ Five cards showing real-time activity for the current day. v2: Live Calls split 
 | **Object** | MEETING |
 | **Metric** | Count of meetings |
 | **Date Field** | hs\_meeting\_start\_time within date range |
-| **Filter 1** | hs\_activity\_type in ('Renewal Strategy', 'Renewal Strategy Alignment', 'Renewal Accelerator', 'Renewal Accelerator Evergreen', 'Renewal Follow-up') |
+| **Filter 1** | hs\_activity\_type in ('Renewal Strategy', 'Renewal Accelerator', 'Renewal Accelerator Evergreen') |
 | **Filter 2** | hs\_meeting\_outcome NOT IN ('CANCELED') |
 | **Filter 3** | hubspot\_owner\_id in (82672208 Sufijan Cunningham, 756332149 Abe Underwood, 82734543 Elisabeth Rogers, 756339074 Melissa Davis, 76930546 Henna Shakoor) |
 | **Group By** | hubspot\_owner\_id |
@@ -346,7 +348,7 @@ Five cards showing real-time activity for the current day. v2: Live Calls split 
 | **Object** | MEETING |
 | **Metric** | Count of meetings |
 | **Date Field** | hs\_meeting\_start\_time within date range |
-| **Filter 1** | hs\_activity\_type in ('Renewal Strategy', 'Renewal Strategy Alignment', 'Renewal Accelerator', 'Renewal Accelerator Evergreen', 'Renewal Follow-up') |
+| **Filter 1** | hs\_activity\_type in ('Renewal Strategy', 'Renewal Accelerator', 'Renewal Accelerator Evergreen') |
 | **Filter 2** | hs\_meeting\_outcome \= 'COMPLETED' |
 | **Filter 3** | hubspot\_owner\_id in (82672208 Sufijan Cunningham, 756332149 Abe Underwood, 82734543 Elisabeth Rogers, 756339074 Melissa Davis, 76930546 Henna Shakoor) |
 | **Group By** | hubspot\_owner\_id |

@@ -6,7 +6,7 @@ models:
   - name: int_renewal__deal_cash
     description: "Cash exploded to (deal, component) grain, each dated by its own field. base+AP1+AP2 today (OPEN_ISSUES #1)."
   - name: int_renewal__meetings
-    description: "Renewal meetings categorized PC/RC/PWC with booked/completed flags, attributed to closers. is_first_call (OPEN_ISSUES #23) flags the first completed call per deal per category, for DPL/Close Rate dedup. is_closing_call flags completed RC/PWC/WB calls that count as a 'Closing call' on the Closing Calls Today card; completed Renewal Follow-up calls still categorize as RC but are excluded from is_closing_call (Celeste). Renewal Strategy Alignment and Renewal Accelerator Evergreen are retired and no longer map to any meeting_category (filtered out). is_closing_call also excludes a PWC when the same deal already has an earlier completed RC that same calendar month (Travis) -- the credit belongs to the RC. When that ordering can't be pinned down precisely (no deal_id, no RC that month, or the PWC isn't the later of the two), both calls count, per the agreed fallback."
+    description: "Renewal meetings categorized PC/RC/PWC with booked/completed flags, attributed to closers. is_first_call (OPEN_ISSUES #23) flags the first completed call per deal per category, for DPL/Close Rate dedup. is_closing_call flags completed RC/PWC/WB calls that count as a 'Closing call' on the Closing Calls Today card. Renewal Follow-up, Renewal Strategy Alignment, and Renewal Accelerator Evergreen are all retired and no longer map to any meeting_category (filtered out) -- business confirmed 2026-09-02. is_closing_call also excludes a PWC when the same deal already has an earlier completed RC that same calendar month (Travis) -- the credit belongs to the RC. When that ordering can't be pinned down precisely (no deal_id, no RC that month, or the PWC isn't the later of the two), both calls count, per the agreed fallback."
 
 unit_tests:
   - name: test_meetings_first_call_dedup_per_deal_and_category
@@ -16,7 +16,7 @@ unit_tests:
       - input: ref('stg_renewal__meetings')
         rows:
           - {meeting_id: 1, owner_id: '82672208', activity_type: 'Renewal Strategy', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-08-01 10:00:00"}
-          - {meeting_id: 2, owner_id: '82672208', activity_type: 'Renewal Follow-up', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-08-05 10:00:00"}
+          - {meeting_id: 2, owner_id: '82672208', activity_type: 'Renewal Strategy', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-08-05 10:00:00"}
           - {meeting_id: 3, owner_id: '82672208', activity_type: 'Renewal Strategy', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-08-10 10:00:00"}
           - {meeting_id: 4, owner_id: '82672208', activity_type: 'Renewal 3 Month', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-08-01 09:00:00"}
           - {meeting_id: 5, owner_id: '82672208', activity_type: 'Renewal Strategy', meeting_outcome: 'CANCELED', meeting_start_at: "2026-07-28 10:00:00"}
@@ -40,12 +40,10 @@ unit_tests:
 
   - name: test_meetings_closing_call_flag_and_retired_activity_types
     description: >
-      Renewal Accelerator Evergreen (retired per Celeste) gets no meeting_category and is filtered out of
-      the model entirely — still true after the 2026-08-28 RC-list reconciliation, which deliberately left
-      it out even though SHARED_FILTERS lists it. Renewal Follow-up still categorizes as RC (still actively
-      used) but is excluded from is_closing_call since it's not a Closing call. Renewal Strategy (an
-      ordinary RC call) categorizes as RC and is_closing_call is true. Renewal Strategy Alignment was added
-      to the RC list on 2026-08-28 and, not being a follow-up, is a closing call.
+      Renewal Accelerator Evergreen, Renewal Follow-up, and Renewal Strategy Alignment (all retired from
+      the RC list -- business confirmed 2026-09-02) get no meeting_category and are filtered out of the
+      model entirely, none of the three showing up in the output at all. Renewal Strategy (an ordinary RC
+      call) categorizes as RC and is_closing_call is true.
     model: int_renewal__meetings
     given:
       - input: ref('stg_renewal__meetings')
@@ -61,18 +59,17 @@ unit_tests:
           - {owner_id: '82672208', closer_name: 'Sufijan Cunningham'}
     expect:
       rows:
-        - {meeting_id: 11, activity_type: 'Renewal Follow-up', meeting_category: 'RC', is_completed: true, is_closing_call: false}
         - {meeting_id: 12, activity_type: 'Renewal Strategy', meeting_category: 'RC', is_completed: true, is_closing_call: true}
-        - {meeting_id: 13, activity_type: 'Renewal Strategy Alignment', meeting_category: 'RC', is_completed: true, is_closing_call: true}
 
   - name: test_meetings_activity_type_casing_is_normalized
     description: >
       Regression guard for the 2026-08-28 case-variant bug. HubSpot began accepting `Renewal Follow-Up`
       (capital U) on 2026-08-24 alongside the long-standing `Renewal Follow-up`; categorizing on the raw
       string sent all 17 to meeting_category = NULL and out of the model, understating RC Completed by 9
-      and RC booked by 12 for August 2026. Both casings must categorize as RC, and BOTH must be excluded
-      from is_closing_call — matching raw there would turn the re-cased ones into closing calls and inflate
-      Live Call Close % / DPL. Leading and trailing whitespace is trimmed too.
+      and RC booked by 12 for August 2026 at the time. Both casings must behave identically -- now that
+      Renewal Follow-up is retired from RC entirely (business confirmed 2026-09-02), "identically" means
+      both casings get no meeting_category and are filtered out, same as before the fix but now on purpose
+      rather than by casing accident. Leading and trailing whitespace on other types is trimmed too.
     model: int_renewal__meetings
     given:
       - input: ref('stg_renewal__meetings')
@@ -88,8 +85,6 @@ unit_tests:
           - {owner_id: '82672208', closer_name: 'Sufijan Cunningham'}
     expect:
       rows:
-        - {meeting_id: 20, meeting_category: 'RC', is_completed: true, is_closing_call: false}
-        - {meeting_id: 21, meeting_category: 'RC', is_completed: true, is_closing_call: false}
         - {meeting_id: 22, meeting_category: 'RC', is_completed: true, is_closing_call: true}
         - {meeting_id: 23, meeting_category: 'PC', is_completed: true, is_closing_call: false}
 

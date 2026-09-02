@@ -200,7 +200,7 @@ metrics:
       filters:
         - property: hs_activity_type
           operator: IN
-          value: ["Renewal Strategy", "Renewal Strategy Alignment", "Renewal Accelerator", "Renewal Accelerator Evergreen", "Renewal Follow-up"]
+          value: ["Renewal Strategy", "Renewal Accelerator", "Renewal Accelerator Evergreen"]
         - {property: hs_meeting_outcome, operator: EQ, value: "COMPLETED"}
         - {property: hubspot_owner_id, operator: EQ, value: ":owner_id"}
         - {property: hs_meeting_start_time, operator: BETWEEN, value: [":start", ":end"]}

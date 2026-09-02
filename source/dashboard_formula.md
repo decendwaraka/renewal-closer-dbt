@@ -282,7 +282,7 @@ identifier from the Formula Spec v2 (57 formulas).
 - **Deal close date** = `upsell___close_date` (Renewal - Close Date).
 - **11-component cash** = `cash_collected + additional_payment__1_amount + additional_payment__2_amount + collected_amount__additional_payment_3 … _10`, each component summed on **its own** stamped/collected date field within the range. *(Warehouse `FCT_RENEWAL_CASH.cash_amount` currently carries base+AP1+AP2 only — see Appendix.)*
 - **PC types** = `hs_activity_type ∈ ('Renewal 3 Month','Renewal Accelerator 3 month')`.
-- **RC types** = `hs_activity_type ∈ ('Renewal Strategy','Renewal Strategy Alignment','Renewal Accelerator','Renewal Accelerator Evergreen','Renewal Follow-up')`.
+- **RC types** = `hs_activity_type ∈ ('Renewal Strategy','Renewal Accelerator','Renewal Accelerator Evergreen')`. (Renewal Strategy Alignment and Renewal Follow-up retired from RC, business confirmed 2026-09-02.)
 - **PWC type** = `hs_activity_type = 'Renewal Post Webinar Call'`.
 - **Meeting attribution/date** = `hubspot_owner_id` on the MEETING · `hs_meeting_start_time`. **Completed** = `hs_meeting_outcome = 'COMPLETED'`; **Booked** = `hs_meeting_outcome NOT IN ('CANCELED')`.
 
