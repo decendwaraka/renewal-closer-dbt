@@ -9,19 +9,24 @@
 -- the meeting-owner restriction this reproduces her report exactly (201 invited / 102 booked / 50.75%
 -- against her 201 / 101 / 50.25%, the +1 being ordinary Fivetran sync drift).
 --
--- The type list below is the union of the PC, RC and PWC branches of int_renewal__meetings, matched on the
--- same LOWER(TRIM(...)) key for the same reason -- `Renewal Follow-Up` (capital U) appeared 2026-08-24 and
--- is still being created, and matching raw drops it. Her own report's filter matches only the lowercase
--- spelling, so those meetings are missing from HER numerator too; that is a HubSpot-side cleanup and one
--- known source of small drift against her figure.
+-- The type list below is the union of the (now-retired-type-trimmed) PC, RC and PWC branches of
+-- int_renewal__meetings, matched on the same LOWER(TRIM(...)) key for the same reason: HubSpot allows the
+-- same activity type under several casings (e.g. `Renewal Follow-Up` with a capital U, which appeared
+-- 2026-08-24 and was still being created before Follow-up was retired) and matching raw would miss them.
 --
--- Two deliberate differences from her six literal activity types:
---   * `Renewal Strategy Alignment` INCLUDED (int_renewal__meetings' RC bucket, added 2026-08-28). 91
---     meetings, all Oct 2025 - Jun 2026, zero in August, so no current window moves.
+-- Two deliberate differences from her six literal activity types, both EXCLUSIONS:
 --   * `Renewal Winback Call` still EXCLUDED. It is not on her filter panel and is category WB, not a
 --     renewal booking. This one is load-bearing: 153 of its 158 meetings were created in August 2026, so
 --     folding it in would inflate the booked side substantially.
--- Keep every literal below lowercase, and in lockstep with the CASE in int_renewal__meetings.
+--   * `Renewal Follow-up` and `Renewal Strategy Alignment` are now BOTH excluded (business confirmed
+--     2026-09-02), retiring them from Booked the same way int_renewal__meetings retired them from RC.
+--     `Renewal Strategy Alignment` was never on her panel to begin with (it was added here 2026-08-28 only
+--     to track int_renewal__meetings' RC bucket at the time). `Renewal Follow-up` IS one of her six panel
+--     types, so this is a deliberate divergence from her live report, not a bug -- expect this table to
+--     undercount her "True Booked" figure by however many Follow-up meetings fall in the window, going
+--     forward. 91 Strategy Alignment + some volume of Follow-up meetings affected; Strategy Alignment's 91
+--     are all Oct 2025 - Jun 2026 (zero in August), so historical ranges move more than the current window.
+-- Keep every remaining literal below lowercase, and in lockstep with the CASE in int_renewal__meetings.
 --
 -- No meeting-outcome filter. A booking counts the moment the meeting record exists, regardless of whether
 -- the call later completed, no-showed or was canceled -- her report has no outcome condition. Completed
@@ -42,8 +47,8 @@ renewal_meetings AS (
         -- PC
         'renewal 3 month', 'renewal accelerator 3 month',
         -- RC
-        'renewal strategy', 'renewal strategy alignment',
-        'renewal accelerator', 'renewal follow-up',
+        'renewal strategy',
+        'renewal accelerator',
         -- PWC
         'renewal post webinar call'
     )

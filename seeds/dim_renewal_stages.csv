@@ -21,7 +21,7 @@ stage_id,pipeline_id,stage_label,stage_group,snapshot_col
 1359841794,898243912,Progress Call Not Completed,renewal_pipeline,pc_not_cmplt
 1359841795,898243912,Progress Call Completed,renewal_pipeline,pc_completed
 1359841800,898243912,Renewal Call Invited,renewal_pipeline,rc_invited
-1359841801,898243912,Renewal Call Booked,renewal_pipeline,rc_scheduled
+1359841801,898243912,Renewal Call Scheduled,renewal_pipeline,rc_scheduled
 1359841802,898243912,Renewal Call Not Completed,renewal_pipeline,rc_not_cmplt
 1359841456,898243912,Closed Won,other,closed_won
 1359841457,898243912,Closed Lost,other,closed_lost
