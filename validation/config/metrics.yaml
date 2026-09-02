@@ -81,7 +81,7 @@ metrics:
         - {amount_prop: collected_amount__additional_payment_4, date_prop: collected_date__additional_payment_4}  # CONFIRM
     comparison: {mode: exact, tolerance: 1.00}
     caveats:
-      - "base+AP1+AP2+AP3+AP4 only, by design -- AP5-12 exist as properties but are 0-populated account-wide (re-verified live 2026-08-11, not a sync gap)"
+      - "base+AP1+AP2+AP3+AP4 only -- NO LONGER 0-populated for AP5+: AP5 went live and populated 2026-09-01 ($2,783.33 across 3 deals, see int_renewal__deal_cash.sql), so this config now undercounts. AP6-12 remain 0-populated until Fivetran syncs each index; re-verify before trusting this list, and add AP5's amount/date property pair here once confirmed live in HubSpot."
       - "AP1/AP2 property names use a different naming pattern than AP3/AP4 in live HubSpot -- both are Fivetran staging-alias guesses, confirm both patterns independently"
 
   # --- Call Outcomes (#10-21, #52-57 for PC/RC/PWC; #69-74 for Win-Back) ---
@@ -105,7 +105,9 @@ metrics:
         - {property: dealstage, operator: IN, value: ["240516941", "1359841792"]}
         - {property: hubspot_owner_id, operator: EQ, value: ":owner_id"}
     comparison: {mode: exact, tolerance: 0}
-    caveats: ["live/current-state count, not date-windowed -- matches dashboard's Pipeline Snapshot semantics"]
+    caveats:
+      - "live/current-state count, not date-windowed -- matches dashboard's Pipeline Snapshot semantics"
+      - "STALE vs the dashboard's Call Outcomes tile: PC Invited (#10) moved off this deal-stage basis on 2026-08-28 onto a contact-grain rebuild (FCT_RENEWAL_CONTACT_INVITES, six HubSpot Contact invite-date properties) to match Celeste's live 'True Booking Rate' report -- see metric-catalog.ts #10. This config still validates the old, superseded definition."
 
   - id: pc_booked
     name: "PC Booked"
@@ -123,7 +125,9 @@ metrics:
         - {property: dealstage, operator: IN, value: ["175346325", "1359841793"]}
         - {property: hubspot_owner_id, operator: EQ, value: ":owner_id"}
     comparison: {mode: exact, tolerance: 0}
-    caveats: ["stage_label is 'Midway Check In Scheduled' -- dashboard calls this tile 'Booked'"]
+    caveats:
+      - "stage_label is 'Midway Check In Scheduled' -- dashboard calls this tile 'Booked'"
+      - "STALE vs the dashboard's Call Outcomes tile: PC Booked (#11) moved off this deal-stage basis on 2026-08-28 onto a contact-grain rebuild (FCT_RENEWAL_CONTACT_BOOKINGS, a renewal-type meeting's hs_createdate) -- see metric-catalog.ts #11. This config still validates the old, superseded definition."
 
   - id: pc_completed
     name: "PC Completed"
@@ -164,7 +168,8 @@ metrics:
         - {property: dealstage, operator: IN, value: ["240516942", "1359841800"]}
         - {property: hubspot_owner_id, operator: EQ, value: ":owner_id"}
     comparison: {mode: exact, tolerance: 0}
-    caveats: []
+    caveats:
+      - "STALE vs the dashboard's Call Outcomes tile: RC Invited (#16) moved off this deal-stage basis on 2026-08-28 onto a contact-grain rebuild (FCT_RENEWAL_CONTACT_INVITES, six HubSpot Contact invite-date properties) to match Celeste's live 'True Booking Rate' report -- see metric-catalog.ts #16. This config still validates the old, superseded definition."
 
   - id: rc_booked
     name: "RC Booked"
@@ -182,7 +187,8 @@ metrics:
         - {property: dealstage, operator: IN, value: ["186350393", "1359841801"]}
         - {property: hubspot_owner_id, operator: EQ, value: ":owner_id"}
     comparison: {mode: exact, tolerance: 0}
-    caveats: []
+    caveats:
+      - "STALE vs the dashboard's Call Outcomes tile: RC Booked (#17) moved off this deal-stage basis on 2026-08-28 onto a contact-grain rebuild (FCT_RENEWAL_CONTACT_BOOKINGS, a renewal-type meeting's hs_createdate) -- see metric-catalog.ts #17. This config still validates the old, superseded definition."
 
   - id: rc_completed
     name: "RC Completed"

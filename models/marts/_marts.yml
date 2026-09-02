@@ -103,8 +103,7 @@ models:
           - accepted_values:
               values: [
                 'renewal 3 month', 'renewal accelerator 3 month',
-                'renewal strategy', 'renewal strategy alignment',
-                'renewal accelerator', 'renewal follow-up',
+                'renewal strategy', 'renewal accelerator',
                 'renewal post webinar call',
               ]
 
