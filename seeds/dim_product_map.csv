@@ -1,26 +1,26 @@
-upsell_plan,product_column,notes
-Renewal - Accelerator Gems,ACC_TIER,Acc product per Celeste 2026-08-08 - Term 1 (Acc tier)
-Renewal - Accelerator Plus,ACC_TIER,Acc product per Celeste 2026-08-08 - Term 1 (Acc tier)
-Renewal - Accelerator DIY,ACC_TIER,Acc product per Celeste 2026-08-08 - Term 1 (Acc tier); legacy value not in current live picklist
-Upgrade DIY to Acc Plus,ACC_TIER,Acc product per Celeste 2026-08-08 - Term 1 (Acc tier)
-Upgrade DIY to Acc Gems,ACC_TIER,Acc product per Celeste 2026-08-08 - Term 1 (Acc tier)
-Winback - Acc Plus,ACC_TIER,Acc product per Celeste 2026-08-08 - Term 1 (Acc tier)
-Winback - Acc Gems,ACC_TIER,Acc product per Celeste 2026-08-08 - Term 1 (Acc tier)
-Upgrade - Mastermind Pro,MM_TIER,MM program per Celeste 2026-08-08 - Term 1 (MM tier)
-Upgrade - Mastermind Premium,MM_TIER,MM program per Celeste 2026-08-08 - Term 1 (MM tier)
-Restart - Mastermind Pro,MM_TIER,MM program per Celeste 2026-08-08 - Term 1 (MM tier)
-Restart - Mastermind Premium,MM_TIER,MM program per Celeste 2026-08-08 - Term 1 (MM tier)
-Renewal - Mastermind Lite,MM_TIER,MM program per Celeste 2026-08-08 - Term 1 (MM tier)
-Winback - MM Pro,MM_TIER,MM program per Celeste 2026-08-08 - Term 1 (MM tier)
-Winback - MM Premium,MM_TIER,MM program per Celeste 2026-08-08 - Term 1 (MM tier)
-Bronze,TERM_2,B/G/P per Celeste 2026-08-08 - Term 2 (2yr renewal - maintenance fee model)
-Gold,TERM_2,B/G/P per Celeste 2026-08-08 - Term 2 (2yr renewal - maintenance fee model)
-Platinum,TERM_2,B/G/P per Celeste 2026-08-08 - Term 2 (2yr renewal - maintenance fee model)
-Renewal - Diamond,TERM_2,Same ladder as B/G/P per Celeste 2026-08-08 - Term 2
-Renewal - Silver,TERM_2,Same ladder as B/G/P per Celeste 2026-08-08 - Term 2
-Upgrade Bronze to Gold,TERM_2,B/G/P per Celeste 2026-08-08 - Term 2
-Upgrade Gold to Platinum,TERM_2,B/G/P per Celeste 2026-08-08 - Term 2
-WB Renewal - Gold,TERM_2,B/G/P per Celeste 2026-08-08 - Term 2
-WB Renewal - Bronze,TERM_2,B/G/P per Celeste 2026-08-08 - Term 2
-WB Renewal - Platinum,TERM_2,B/G/P per Celeste 2026-08-08 - Term 2
-Winback - Silver,TERM_2,Same ladder as B/G/P per Celeste 2026-08-08 - Term 2
+upsell_plan,product_column,pipeline_type,notes
+Renewal - Accelerator Gems,ACC_TIER,Renewal,Acc product per Celeste 2026-08-08 - Term 1 (Acc tier)
+Renewal - Accelerator Plus,ACC_TIER,Renewal,Acc product per Celeste 2026-08-08 - Term 1 (Acc tier)
+Renewal - Accelerator DIY,ACC_TIER,Renewal,Acc product per Celeste 2026-08-08 - Term 1 (Acc tier); legacy value not in current live picklist
+Upgrade DIY to Acc Plus,ACC_TIER,Upgrade,Acc product per Celeste 2026-08-08 - Term 1 (Acc tier)
+Upgrade DIY to Acc Gems,ACC_TIER,Upgrade,Acc product per Celeste 2026-08-08 - Term 1 (Acc tier)
+Winback - Acc Plus,ACC_TIER,Win-Back,Acc product per Celeste 2026-08-08 - Term 1 (Acc tier)
+Winback - Acc Gems,ACC_TIER,Win-Back,Acc product per Celeste 2026-08-08 - Term 1 (Acc tier)
+Upgrade - Mastermind Pro,MM_TIER,Upgrade,MM program per Celeste 2026-08-08 - Term 1 (MM tier)
+Upgrade - Mastermind Premium,MM_TIER,Upgrade,MM program per Celeste 2026-08-08 - Term 1 (MM tier)
+Restart - Mastermind Pro,MM_TIER,Restart,MM program per Celeste 2026-08-08 - Term 1 (MM tier)
+Restart - Mastermind Premium,MM_TIER,Restart,MM program per Celeste 2026-08-08 - Term 1 (MM tier)
+Renewal - Mastermind Lite,MM_TIER,Renewal,MM program per Celeste 2026-08-08 - Term 1 (MM tier); retired product per Celeste 2026-09-04
+Winback - MM Pro,MM_TIER,Win-Back,MM program per Celeste 2026-08-08 - Term 1 (MM tier)
+Winback - MM Premium,MM_TIER,Win-Back,MM program per Celeste 2026-08-08 - Term 1 (MM tier)
+Bronze,TERM_2,Renewal,B/G/P per Celeste 2026-08-08 - Term 2 (2yr renewal - maintenance fee model)
+Gold,TERM_2,Renewal,B/G/P per Celeste 2026-08-08 - Term 2 (2yr renewal - maintenance fee model)
+Platinum,TERM_2,Renewal,B/G/P per Celeste 2026-08-08 - Term 2 (2yr renewal - maintenance fee model)
+Renewal - Diamond,TERM_2,Renewal,Same ladder as B/G/P per Celeste 2026-08-08 - Term 2
+Renewal - Silver,TERM_2,Renewal,Same ladder as B/G/P per Celeste 2026-08-08 - Term 2
+Upgrade Bronze to Gold,TERM_2,Upgrade,B/G/P per Celeste 2026-08-08 - Term 2
+Upgrade Gold to Platinum,TERM_2,Upgrade,B/G/P per Celeste 2026-08-08 - Term 2
+WB Renewal - Gold,TERM_2,Win-Back,B/G/P per Celeste 2026-08-08 - Term 2
+WB Renewal - Bronze,TERM_2,Win-Back,B/G/P per Celeste 2026-08-08 - Term 2
+WB Renewal - Platinum,TERM_2,Win-Back,B/G/P per Celeste 2026-08-08 - Term 2
+Winback - Silver,TERM_2,Win-Back,Same ladder as B/G/P per Celeste 2026-08-08 - Term 2
