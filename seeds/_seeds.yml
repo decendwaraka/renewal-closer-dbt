@@ -25,15 +25,36 @@ seeds:
         tests: [unique, not_null]
 
   - name: dim_product_map
-    description: "Maps upsell_plan values to product tier columns (ACC_T1/MM_T1/TERM_2) per Celeste/RevOps 2026-08-08 (OPEN_ISSUES #2)."
+    description: >
+      Maps upsell_plan values to two independent splits: product_column, the product tier
+      (ACC_TIER/MM_TIER/TERM_2) per Celeste/RevOps 2026-08-08 (OPEN_ISSUES #2), and pipeline_type,
+      the commercial motion (Upgrade/Restart/Renewal/Win-Back) backing the Product Mix heatmap
+      (2026-09-07). The two are orthogonal -- e.g. 'Upgrade - Mastermind Pro' is MM_TIER x Upgrade,
+      'Winback - MM Pro' is MM_TIER x Win-Back.
     config:
       column_types:
         upsell_plan: varchar
         product_column: varchar
+        pipeline_type: varchar
         notes: varchar
     columns:
       - name: upsell_plan
         tests: [unique, not_null]
+      - name: product_column
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['ACC_TIER', 'MM_TIER', 'TERM_2']
+      - name: pipeline_type
+        description: >
+          Commercial motion. Seeded rather than derived from the upsell_plan name prefix so a future
+          value like 'Renewal - Upgrade Path' cannot be silently misclassified. fct_renewal_cash
+          overrides this to 'Win-Back' for any deal in the Winbacks Pipeline, so the pipeline always
+          wins over the product name.
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Upgrade', 'Restart', 'Renewal', 'Win-Back']
 
   - name: dim_member_tier_map
     description: "Maps active_product_snapshot_at_won values to tier-of-origin columns (ACC_TIER/MM_TIER/TERM_2) per Celeste 2026-08-12 (OPEN_ISSUES #8) -- separate from dim_product_map, which stays on upsell_plan for the product-mix split. Join is case-insensitive in int_renewal__won_deals.sql since live data has inconsistent casing (e.g. 'Defi'/'DeFi')."

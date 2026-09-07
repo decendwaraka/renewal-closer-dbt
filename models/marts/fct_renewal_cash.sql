@@ -5,6 +5,8 @@
 -- Two independent tier splits live here (OPEN_ISSUES #8): product_column (product mix, from
 -- upsell_plan -- what they're renewing into) and tier_of_origin_column (from
 -- active_product_snapshot_at_won -- what tier they were on before this renewal). Not supposed to agree.
+-- pipeline_type (2026-09-07) is a third, coarser split of upsell_plan into the four commercial
+-- motions -- Upgrade / Restart / Renewal / Win-Back -- backing the Product Mix heatmap.
 
 WITH cash AS (
     SELECT * FROM {{ ref('int_renewal__deal_cash') }}
@@ -18,13 +20,12 @@ deals AS (
         renewal_year_count,
         orig_product_category,
         upsell_plan,
-        renewal_product_pitched,
         active_product_snapshot_at_won
     FROM {{ ref('int_renewal__won_deals') }}
 ),
 
 product_map AS (
-    SELECT upsell_plan, product_column FROM {{ ref('dim_product_map') }}
+    SELECT upsell_plan, product_column, pipeline_type FROM {{ ref('dim_product_map') }}
 ),
 
 tier_map AS (
@@ -55,6 +56,17 @@ final AS (
             WHEN d.pipeline_id = '{{ var('winback_pipeline_id') }}' THEN 'WINBACK'
             ELSE COALESCE(pm.product_column, 'UNMAPPED')
         END AS product_column,
+        -- Product Mix heatmap (2026-09-07): the four commercial motions. HubSpot has no property for
+        -- this -- renewal_pipeline_type is 99.999% null account-wide and was retired from scope
+        -- 2026-08-08 -- so it is seeded per upsell_plan in dim_product_map.csv rather than derived
+        -- from a name prefix, which would silently misclassify a future value like
+        -- 'Renewal - Upgrade Path'. Same Win-Back precedence as product_column above: the pipeline
+        -- decides, never the words in the product name, so a Winback-flavored plan sold outside the
+        -- Winbacks Pipeline can never be double-counted. Both signals agree on every live row today.
+        CASE
+            WHEN d.pipeline_id = '{{ var('winback_pipeline_id') }}' THEN 'Win-Back'
+            ELSE COALESCE(pm.pipeline_type, 'UNMAPPED')
+        END AS pipeline_type,
         d.active_product_snapshot_at_won,
         -- OPEN ISSUE #8 resolved 2026-08-12: seeds/dim_member_tier_map.csv maps
         -- active_product_snapshot_at_won to ACC_TIER/MM_TIER/TERM_2. Case-insensitive join -- live

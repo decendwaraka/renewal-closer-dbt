@@ -2,8 +2,39 @@ version: 2
 
 models:
   - name: fct_renewal_cash
-    description: "Payment-grain cash fact (base+AP1+AP2 today; OPEN_ISSUES #1). ET-dated, with product attrs."
+    description: >
+      Payment-grain cash fact: one row per (deal, cash component), where a component is the base
+      Cash Collected plus AP1-AP12 (all twelve wired as of 2026-09-01, PR #27). Each component is
+      dated in ET by its own stamp date, so a payment plan lands in the month it collected, not the
+      month the deal closed. Carries three independent splits of the same cash: product_column
+      (tier renewed into), tier_of_origin_column (tier renewed from), pipeline_type (commercial
+      motion). Sum cash_amount at query time for any window.
     # cash_amount non-negativity enforced by tests/assert_cash_nonnegative.sql (no dbt_utils dependency)
+    columns:
+      - name: cash_date_et
+        description: "ET date this component collected. The only date on this model -- there is no close date here."
+        tests: [not_null]
+      - name: product_column
+        description: "Product tier renewed into, from dim_product_map.csv; WINBACK for any Winbacks Pipeline deal."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['ACC_TIER', 'MM_TIER', 'TERM_2', 'WINBACK', 'UNMAPPED']
+      - name: tier_of_origin_column
+        description: "Tier the member was on before this renewal, from dim_member_tier_map.csv (case-insensitive join)."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['ACC_TIER', 'MM_TIER', 'TERM_2', 'UNMAPPED']
+      - name: pipeline_type
+        description: >
+          Commercial motion behind the deal, from dim_product_map.csv, overridden to 'Win-Back' for
+          any deal in the Winbacks Pipeline. UNMAPPED means a new HubSpot upsell_plan value has
+          appeared that the seed does not cover -- this test is the tripwire for that.
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Upgrade', 'Restart', 'Renewal', 'Win-Back', 'UNMAPPED']
 
   - name: fct_renewal_meetings
     description: "Meeting-grain fact: PC/RC/PWC/WB category + booked/completed flags."
