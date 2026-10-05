@@ -12,11 +12,19 @@
 -- out of the model entirely. Locked in by the test_meetings_closing_call_flag_and_retired_activity_types
 -- unit test. Only `Renewal Strategy` and `Renewal Accelerator` remain in RC.
 --
--- is_closing_call drops a PWC from Close Rate credit when the same deal already has an
--- earlier completed RC that same calendar month (Travis, live) -- the credit belongs to the RC,
--- not a repeat count. See rc_month_anchor below; when the ordering can't be pinned down (no
--- deal_id, no RC that month, or the PWC isn't the later one) both calls count, per the agreed
--- fallback.
+-- is_closing_call drops a PWC from Close Rate credit when the same deal already has a completed RC
+-- that same calendar month (Travis, live) -- the credit belongs to the RC, not a repeat count. This
+-- applies regardless of which of the two happened first within the month (fixed 2026-10-05,
+-- OPEN_ISSUES Close Rate contact-count review): the PWC is dropped whenever a same-month RC exists,
+-- not only when the RC is the earlier of the two. See rc_month_anchor below; when the ordering can't
+-- be pinned down at all (no deal_id, or no RC that month) both calls count, per the agreed fallback.
+--
+-- is_closing_call also requires is_first_call for RC/PWC/WB (fixed 2026-10-05, same review): without
+-- it, two completed calls in the same category on the same deal (e.g. two RCs on one member in one
+-- month) both earned Close Rate credit. is_first_call already identifies the earlier call per
+-- (deal_id, meeting_category); is_closing_call now defers to it instead of re-deriving its own
+-- dedup. Unlinked meetings (deal_id IS NULL) are unaffected -- they default is_first_call to TRUE,
+-- same as before.
 
 WITH meetings AS (
     SELECT * FROM {{ ref('stg_renewal__meetings') }}
@@ -109,15 +117,18 @@ SELECT
     (
         f.meeting_category IN ('RC', 'PWC', 'WB')
         AND f.is_completed
-        -- Deliberate fallback (Travis/Derek): only exclude a PWC when we can positively place it
-        -- after a same-deal, same-month RC. Any case we can't pin down that way -- no deal_id
-        -- (unlinked meeting), no RC that month, or the PWC isn't the later of the two -- counts
-        -- both calls rather than guessing which one to drop.
+        -- First-call dedup: a repeat completed call in the same category on the same deal (e.g. a
+        -- second RC on one member in one month) never earns its own Close Rate credit.
+        AND COALESCE(cr.is_first_call, TRUE)
+        -- Deliberate fallback (Travis/Derek): only exclude a PWC when we can positively place a
+        -- same-deal, same-month RC against it. Any case we can't pin down that way -- no deal_id
+        -- (unlinked meeting) or no RC that month -- counts both calls rather than guessing which
+        -- one to drop. Order within the month no longer matters: the credit belongs to the RC
+        -- whether the PWC landed before or after it.
         AND NOT (
             f.meeting_category = 'PWC'
             AND f.deal_id IS NOT NULL
             AND rc.first_rc_start_at IS NOT NULL
-            AND f.meeting_start_at > rc.first_rc_start_at
         )
     ) AS is_closing_call
 FROM filtered AS f
