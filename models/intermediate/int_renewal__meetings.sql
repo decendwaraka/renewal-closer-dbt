@@ -25,6 +25,15 @@
 -- (deal_id, meeting_category); is_closing_call now defers to it instead of re-deriving its own
 -- dedup. Unlinked meetings (deal_id IS NULL) are unaffected -- they default is_first_call to TRUE,
 -- same as before.
+--
+-- Win-Back types, reconciled 2026-10-11 (Celeste): HubSpot renamed the Win-Back meeting types, and
+-- for hs_activity_type the stored value IS the label, so the rename changed the value too.
+-- `Renewal Winback Call` is no longer a HubSpot option; `Winback Call` replaced it (in use since
+-- 2026-08-04, ~100 calls this model was silently dropping). Both map to WB. The Follow-Up and
+-- Webinar types (old and new names) count on Call Outcomes only, per Celeste -- they get their own
+-- categories, WB_FOLLOW_UP and WB_WEBINAR, so they stay out of is_first_call / is_closing_call and
+-- never earn Close Rate or DPL credit. The dashboard folds all three into the Win-Back row, same
+-- way it folds PWC into RC.
 
 WITH meetings AS (
     SELECT * FROM {{ ref('stg_renewal__meetings') }}
@@ -55,8 +64,12 @@ categorized AS (
                 THEN 'RC'
             WHEN LOWER(TRIM(m.activity_type)) = 'renewal post webinar call'
                 THEN 'PWC'
-            WHEN LOWER(TRIM(m.activity_type)) = 'renewal winback call'
+            WHEN LOWER(TRIM(m.activity_type)) IN ('renewal winback call', 'winback call')
                 THEN 'WB'
+            WHEN LOWER(TRIM(m.activity_type)) IN ('renewal winback follow-up', 'winback follow-up')
+                THEN 'WB_FOLLOW_UP'
+            WHEN LOWER(TRIM(m.activity_type)) IN ('renewal winback webinar call', 'winback webinar')
+                THEN 'WB_WEBINAR'
             ELSE NULL
         END                                     AS meeting_category,
         {{ is_meeting_booked('m.meeting_outcome') }}     AS is_booked,
