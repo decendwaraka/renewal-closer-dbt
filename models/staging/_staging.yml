@@ -42,3 +42,48 @@ models:
     columns:
       - name: deal_id
         tests: [unique, not_null]
+
+  - name: stg_renewal__contact_merges
+    description: "Merged-away contact id -> surviving contact id, from the survivor's hs_merged_object_ids. Fivetran's association tables keep pointing at merged-away ids; resolving through this is what makes the Live Call Close Rate match HubSpot (2026-10-18)."
+    columns:
+      - name: merged_contact_id
+        tests: [unique, not_null]
+      - name: contact_id
+        tests: [not_null]
+
+  - name: stg_renewal__engagement_contacts
+    description: "One row per (meeting_id, contact_id) across every engagement, no activity-type filter, contact_id resolved through stg_renewal__contact_merges. Backs the contact-grain Live Call Close Rate (int_renewal__live_call_contacts)."
+    columns:
+      - name: meeting_id
+        tests: [not_null]
+      - name: contact_id
+        tests: [not_null]
+
+  - name: stg_renewal__deal_contact_pairs
+    description: "One row per (deal_id, contact_id). Pair grain, unlike stg_renewal__deal_contacts (deal grain). Backs the Live Call Close Rate's won-after-meeting check."
+    columns:
+      - name: deal_id
+        tests: [not_null]
+      - name: contact_id
+        tests: [not_null]
+
+unit_tests:
+  - name: test_engagement_contacts_resolve_merged_contacts
+    description: >
+      A meeting still associated with a merged-away contact id is credited to the surviving contact, the
+      way HubSpot does it (2026-10-18 Close Rate reconciliation). Two association rows that resolve to the
+      same (meeting, contact) pair collapse to one; unmerged ids pass through unchanged.
+    model: stg_renewal__engagement_contacts
+    given:
+      - input: source('hubspot_raw', 'ENGAGEMENT_CONTACT')
+        rows:
+          - {engagement_id: 1, contact_id: 111}
+          - {engagement_id: 1, contact_id: 999}
+          - {engagement_id: 2, contact_id: 222}
+      - input: ref('stg_renewal__contact_merges')
+        rows:
+          - {merged_contact_id: '111', contact_id: '999'}
+    expect:
+      rows:
+        - {meeting_id: 1, contact_id: '999'}
+        - {meeting_id: 2, contact_id: '222'}

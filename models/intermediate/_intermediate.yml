@@ -7,8 +7,68 @@ models:
     description: "Cash exploded to (deal, component) grain, each dated by its own field. base+AP1+AP2 today (OPEN_ISSUES #1)."
   - name: int_renewal__meetings
     description: "Renewal meetings categorized PC/RC/PWC/WB (plus WB_FOLLOW_UP and WB_WEBINAR, Call Outcomes only -- Celeste 2026-10-11) with booked/completed flags, attributed to closers. is_first_call (OPEN_ISSUES #23) flags the first completed call per deal per category, for DPL/Close Rate dedup. is_closing_call flags completed RC/PWC/WB calls that count as a 'Closing call' on the Closing Calls Today card. Renewal Follow-up, Renewal Strategy Alignment, and Renewal Accelerator Evergreen are all retired and no longer map to any meeting_category (filtered out) -- business confirmed 2026-09-02. is_closing_call also excludes a PWC when the same deal already has an earlier completed RC that same calendar month (Travis) -- the credit belongs to the RC. When that ordering can't be pinned down precisely (no deal_id, no RC that month, or the PWC isn't the later of the two), both calls count, per the agreed fallback."
+  - name: int_renewal__live_call_contacts
+    description: "One row per (meeting_id, contact_id) for COMPLETED closer-owned live calls, matching the team's HubSpot 'Live to Close Rate' report (2026-10-18). Types: Renewal Accelerator, Renewal Strategy, Renewal Post Webinar Call, Mentor Handoff, Winback Call, Winback Webinar -- legacy Renewal Winback Call excluded. is_won_after_meeting = the contact has any closed-won deal (renewal or win-back stage, any owner) with close date on or after the meeting date, no upper bound. Close Rate = COUNT(DISTINCT won contacts) / COUNT(DISTINCT contacts) over the window, counted at query time."
 
 unit_tests:
+  - name: test_live_call_contacts_types_outcome_and_won_after_meeting
+    description: >
+      Mirrors the HubSpot Live to Close Rate report. A close on the same day as the meeting counts; a
+      close the day before doesn't; a non-won stage doesn't; a win-back won stage counts even a month
+      later (no upper bound). Mentor Handoff and Winback Webinar are live calls; legacy Renewal Winback
+      Call, canceled calls, and non-closer owners are out. A contact with two meetings gets one row per
+      meeting, each judged against its own date.
+    model: int_renewal__live_call_contacts
+    given:
+      - input: ref('stg_renewal__meetings')
+        rows:
+          - {meeting_id: 1, owner_id: '82672208', activity_type: 'Renewal Strategy', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-09-10 16:00:00"}
+          - {meeting_id: 2, owner_id: '82672208', activity_type: 'Mentor Handoff', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-09-10 16:00:00"}
+          - {meeting_id: 3, owner_id: '82672208', activity_type: 'Winback Webinar', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-09-10 16:00:00"}
+          - {meeting_id: 4, owner_id: '82672208', activity_type: 'Renewal Winback Call', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-09-10 16:00:00"}
+          - {meeting_id: 5, owner_id: '82672208', activity_type: 'Renewal Post Webinar Call', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-09-12 16:00:00"}
+          - {meeting_id: 6, owner_id: '82672208', activity_type: 'Winback Call', meeting_outcome: 'CANCELED', meeting_start_at: "2026-09-10 16:00:00"}
+          - {meeting_id: 7, owner_id: '82672208', activity_type: 'Winback Call', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-09-15 16:00:00"}
+          - {meeting_id: 8, owner_id: '99999999', activity_type: 'Renewal Strategy', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-09-10 16:00:00"}
+      - input: ref('dim_closers')
+        rows:
+          - {owner_id: '82672208', closer_name: 'Sufijan Cunningham'}
+      - input: ref('stg_renewal__engagement_contacts')
+        rows:
+          - {meeting_id: 1, contact_id: 'A'}
+          - {meeting_id: 2, contact_id: 'B'}
+          - {meeting_id: 3, contact_id: 'C'}
+          - {meeting_id: 4, contact_id: 'D'}
+          - {meeting_id: 5, contact_id: 'A'}
+          - {meeting_id: 6, contact_id: 'E'}
+          - {meeting_id: 7, contact_id: 'F'}
+          - {meeting_id: 8, contact_id: 'G'}
+      - input: ref('stg_renewal__deal_contact_pairs')
+        rows:
+          - {deal_id: 100, contact_id: 'A'}
+          - {deal_id: 200, contact_id: 'B'}
+          - {deal_id: 300, contact_id: 'C'}
+          - {deal_id: 400, contact_id: 'D'}
+          - {deal_id: 600, contact_id: 'E'}
+          - {deal_id: 700, contact_id: 'F'}
+          - {deal_id: 800, contact_id: 'G'}
+      - input: ref('stg_renewal__deals')
+        rows:
+          - {deal_id: 100, dealstage_id: '175346331', close_date: "2026-09-10"}
+          - {deal_id: 200, dealstage_id: '175346331', close_date: "2026-09-09"}
+          - {deal_id: 300, dealstage_id: '175346329', close_date: "2026-09-20"}
+          - {deal_id: 400, dealstage_id: '1401758776', close_date: "2026-09-20"}
+          - {deal_id: 600, dealstage_id: '1401758776', close_date: "2026-09-20"}
+          - {deal_id: 700, dealstage_id: '1401758776', close_date: "2026-10-05"}
+          - {deal_id: 800, dealstage_id: '175346331', close_date: "2026-09-20"}
+    expect:
+      rows:
+        - {meeting_id: 1, contact_id: 'A', meeting_date_et: "2026-09-10", is_won_after_meeting: true, first_won_close_date_et: "2026-09-10"}
+        - {meeting_id: 2, contact_id: 'B', meeting_date_et: "2026-09-10", is_won_after_meeting: false, first_won_close_date_et: null}
+        - {meeting_id: 3, contact_id: 'C', meeting_date_et: "2026-09-10", is_won_after_meeting: false, first_won_close_date_et: null}
+        - {meeting_id: 5, contact_id: 'A', meeting_date_et: "2026-09-12", is_won_after_meeting: false, first_won_close_date_et: null}
+        - {meeting_id: 7, contact_id: 'F', meeting_date_et: "2026-09-15", is_won_after_meeting: true, first_won_close_date_et: "2026-10-05"}
+
   - name: test_meetings_first_call_dedup_per_deal_and_category
     description: "Only the earliest completed RC/PWC/WB call per (deal_id, meeting_category) is_first_call; a later completed call on the same deal+category is a follow-up (false). Canceled calls don't count toward ranking, so a completed call with an earlier canceled call still comes out first. PC is out of scope for dedup (always true). A call with no HubSpot deal association can't be identified as a follow-up, so it defaults to true rather than being dropped (OPEN_ISSUES #23)."
     model: int_renewal__meetings
