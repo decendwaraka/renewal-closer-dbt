@@ -36,6 +36,17 @@ models:
           - accepted_values:
               values: ['Upgrade', 'Restart', 'Renewal', 'Win-Back', 'UNMAPPED']
 
+  - name: fct_renewal_live_call_contacts
+    description: "(meeting, contact)-grain fact behind the Leaderboard's Live Call Close %, matching the team's HubSpot 'Live to Close Rate' report. Close % = COUNT(DISTINCT IFF(is_won_after_meeting, contact_id, NULL)) / COUNT(DISTINCT contact_id) over meeting_date_et; the team rate is distinct across closers, not a sum. DPL does NOT use this -- it stays on fct_renewal_meetings.is_closing_call."
+    columns:
+      - name: meeting_id
+        tests: [not_null]
+      - name: contact_id
+        tests: [not_null]
+      - name: meeting_date_et
+        tests: [not_null]
+      # one row per (meeting_id, contact_id) enforced by tests/assert_live_call_contacts_unique_pair.sql
+
   - name: fct_renewal_meetings
     description: "Meeting-grain fact: PC/RC/PWC/WB/WB_FOLLOW_UP/WB_WEBINAR category + booked/completed flags. WB_FOLLOW_UP and WB_WEBINAR are Call Outcomes only -- never first-call ranked, never closing calls."
     columns:
