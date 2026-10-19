@@ -11,11 +11,17 @@
 -- date range works. A contact counts as won for the window if any of its meetings in the window is
 -- is_won_after_meeting -- which is exactly COUNT(DISTINCT IFF(is_won_after_meeting, contact_id, NULL)).
 --
--- The activity-type list deliberately differs from int_renewal__meetings, to match the report exactly:
---   * includes `Mentor Handoff` and `Winback Webinar`, which aren't live calls anywhere else in the model;
+-- The activity-type list deliberately differs from int_renewal__meetings' meeting_category buckets, to
+-- match the report exactly:
+--   * includes `Mentor Handoff` and `Winback Webinar`, which aren't RC/PWC/WB live calls elsewhere;
 --   * excludes the legacy `Renewal Winback Call` value (still being created alongside `Winback Call`).
--- Nor is there any first-call or PWC-after-RC dedup -- the report counts contacts, not calls. DPL and the
--- Today tiles keep using is_closing_call; only Close Rate reads this model.
+-- Nor is there any first-call or PWC-after-RC dedup -- the report counts contacts, not calls.
+--
+-- The list moved into the dpl_call_types() macro on 2026-10-19 (Celeste): her Avg DPL report 445533588
+-- turned out to use the same six types, so int_renewal__meetings.is_dpl_call now reads the same macro.
+-- Keeping one definition means the next HubSpot meeting-type rename (as happened to all four Win-Back
+-- types on 2026-10-11) can't fix Close Rate while silently leaving DPL broken, or vice versa.
+-- The Today tiles keep using is_closing_call; only Close Rate reads this model.
 --
 -- No Internal Test contact exclusion either: the report has none.
 --
@@ -33,14 +39,7 @@ WITH meetings AS (
         {{ to_et_date('m.meeting_start_at') }} AS meeting_date_et
     FROM {{ ref('stg_renewal__meetings') }} AS m
     INNER JOIN {{ ref('dim_closers') }} AS c ON m.owner_id = c.owner_id
-    WHERE LOWER(TRIM(m.activity_type)) IN (
-            'renewal accelerator',
-            'renewal strategy',
-            'renewal post webinar call',
-            'mentor handoff',
-            'winback call',
-            'winback webinar'
-        )
+    WHERE LOWER(TRIM(m.activity_type)) IN ({{ dpl_call_types() }})
       AND {{ is_meeting_completed('m.meeting_outcome') }}
 ),
 

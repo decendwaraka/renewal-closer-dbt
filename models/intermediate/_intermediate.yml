@@ -6,7 +6,20 @@ models:
   - name: int_renewal__deal_cash
     description: "Cash exploded to (deal, component) grain, each dated by its own field. base+AP1+AP2 today (OPEN_ISSUES #1)."
   - name: int_renewal__meetings
-    description: "Renewal meetings categorized PC/RC/PWC/WB (plus WB_FOLLOW_UP and WB_WEBINAR, Call Outcomes only -- Celeste 2026-10-11) with booked/completed flags, attributed to closers. is_first_call (OPEN_ISSUES #23) flags the first completed call per deal per category, for DPL/Close Rate dedup. is_closing_call flags completed RC/PWC/WB calls that count as a 'Closing call' on the Closing Calls Today card. Renewal Follow-up, Renewal Strategy Alignment, and Renewal Accelerator Evergreen are all retired and no longer map to any meeting_category (filtered out) -- business confirmed 2026-09-02. is_closing_call also excludes a PWC when the same deal already has an earlier completed RC that same calendar month (Travis) -- the credit belongs to the RC. When that ordering can't be pinned down precisely (no deal_id, no RC that month, or the PWC isn't the later of the two), both calls count, per the agreed fallback."
+    description: >
+      Renewal meetings categorized PC/RC/PWC/WB (plus WB_FOLLOW_UP and WB_WEBINAR, Call Outcomes only
+      -- Celeste 2026-10-11, and FOLLOW_UP and MENTOR_HANDOFF, also Call Outcomes only -- Celeste
+      2026-10-19) with booked/completed flags, attributed to closers. is_first_call (OPEN_ISSUES #23)
+      flags the first completed call per deal per category, for Close Rate dedup. is_closing_call flags
+      completed RC/PWC/WB calls that count as a 'Closing call' on the Closing Calls Today card and backs
+      Close %. is_dpl_call is a SEPARATE, undeduped, outcome-agnostic flag that backs Avg DPL (Celeste,
+      2026-10-19) -- see the dpl_call_types() macro; it is not derivable from meeting_category.
+      Renewal Strategy Alignment and Renewal Accelerator Evergreen remain retired and map to no
+      meeting_category (filtered out) -- business confirmed 2026-09-02, re-confirmed 2026-10-19. Renewal
+      Follow-up was retired with them but came back on 2026-10-19 as FOLLOW_UP, Call Outcomes only.
+      is_closing_call also excludes a PWC when the same deal already has a completed RC that same
+      calendar month (Travis) -- the credit belongs to the RC. When that ordering can't be pinned down
+      precisely (no deal_id, no RC that month), both calls count, per the agreed fallback.
   - name: int_renewal__live_call_contacts
     description: "One row per (meeting_id, contact_id) for COMPLETED closer-owned live calls, matching the team's HubSpot 'Live to Close Rate' report (2026-10-18). Types: Renewal Accelerator, Renewal Strategy, Renewal Post Webinar Call, Mentor Handoff, Winback Call, Winback Webinar -- legacy Renewal Winback Call excluded. is_won_after_meeting = the contact has any closed-won deal (renewal or win-back stage, any owner) with close date on or after the meeting date, no upper bound. Close Rate = COUNT(DISTINCT won contacts) / COUNT(DISTINCT contacts) over the window, counted at query time."
 
@@ -100,10 +113,14 @@ unit_tests:
 
   - name: test_meetings_closing_call_flag_and_retired_activity_types
     description: >
-      Renewal Accelerator Evergreen, Renewal Follow-up, and Renewal Strategy Alignment (all retired from
-      the RC list -- business confirmed 2026-09-02) get no meeting_category and are filtered out of the
-      model entirely, none of the three showing up in the output at all. Renewal Strategy (an ordinary RC
-      call) categorizes as RC and is_closing_call is true.
+      Renewal Accelerator Evergreen and Renewal Strategy Alignment stay fully retired (business
+      confirmed 2026-09-02, re-confirmed by Celeste 2026-10-19 when Follow-up came back): neither maps
+      to a meeting_category and both are filtered out of the model entirely, so neither appears in the
+      output at all. Renewal Follow-up is NO LONGER retired -- as of 2026-10-19 (Celeste, Metrics Guide
+      #2) it returns as its own FOLLOW_UP category for Call Outcomes, but earns no Close Rate credit:
+      is_closing_call must be false even though the call is completed, because a follow-up revisits a
+      call that already happened and crediting it would double-count the original RC. Renewal Strategy
+      (an ordinary RC call) still categorizes as RC with is_closing_call true.
     model: int_renewal__meetings
     given:
       - input: ref('stg_renewal__meetings')
@@ -119,17 +136,95 @@ unit_tests:
           - {owner_id: '82672208', closer_name: 'Sufijan Cunningham'}
     expect:
       rows:
+        - {meeting_id: 11, activity_type: 'Renewal Follow-up', meeting_category: 'FOLLOW_UP', is_completed: true, is_closing_call: false}
         - {meeting_id: 12, activity_type: 'Renewal Strategy', meeting_category: 'RC', is_completed: true, is_closing_call: true}
+
+  - name: test_meetings_follow_up_and_mentor_handoff_are_call_outcomes_only
+    description: >
+      Celeste, 2026-10-19 (Metrics Guide #2 / #3b). Both spellings of Follow-up -- hyphen and space --
+      map to FOLLOW_UP, and Mentor Handoff maps to MENTOR_HANDOFF. Neither category is in the
+      IN ('RC','PWC','WB') lists, so neither is first-call ranked and neither can ever be a closing
+      call, exactly like the existing WB_FOLLOW_UP / WB_WEBINAR precedent. That separation is the whole
+      point of giving them their own categories: the team wanted their real call volume back on Call
+      Outcomes (~75 Follow-ups and ~5 Mentor Handoffs completed in a 30-day window) WITHOUT moving
+      Close % or Deals Won, since a Mentor Handoff transfers the member to a mentor rather than pitching
+      a renewal and a Follow-up revisits a call already credited elsewhere.
+      is_dpl_call is asserted independently here, and shows why it cannot be derived from
+      meeting_category: Mentor Handoff is one of Celeste's six DPL types and so is TRUE, while Follow-up
+      is not and so is FALSE -- two Call-Outcomes-only categories landing on opposite sides of DPL. The
+      canceled Mentor Handoff confirms there is no outcome filter on the DPL flag.
+    model: int_renewal__meetings
+    given:
+      - input: ref('stg_renewal__meetings')
+        rows:
+          - {meeting_id: 90, owner_id: '82672208', activity_type: 'Renewal Follow-up', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-10-01 10:00:00"}
+          - {meeting_id: 91, owner_id: '82672208', activity_type: 'Renewal Follow Up', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-10-02 10:00:00"}
+          - {meeting_id: 92, owner_id: '82672208', activity_type: 'Mentor Handoff', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-10-03 10:00:00"}
+          - {meeting_id: 93, owner_id: '82672208', activity_type: '  MENTOR HANDOFF ', meeting_outcome: 'CANCELED', meeting_start_at: "2026-10-04 10:00:00"}
+      - input: ref('stg_renewal__meeting_deals')
+        rows:
+          - {meeting_id: 90, deal_id: 500}
+          - {meeting_id: 91, deal_id: 500}
+          - {meeting_id: 92, deal_id: 501}
+      - input: ref('dim_closers')
+        rows:
+          - {owner_id: '82672208', closer_name: 'Sufijan Cunningham'}
+    expect:
+      rows:
+        - {meeting_id: 90, meeting_category: 'FOLLOW_UP', is_completed: true, is_dpl_call: false, is_closing_call: false}
+        - {meeting_id: 91, meeting_category: 'FOLLOW_UP', is_completed: true, is_dpl_call: false, is_closing_call: false}
+        - {meeting_id: 92, meeting_category: 'MENTOR_HANDOFF', is_completed: true, is_dpl_call: true, is_closing_call: false}
+        - {meeting_id: 93, meeting_category: 'MENTOR_HANDOFF', is_completed: false, is_dpl_call: true, is_closing_call: false}
+
+  - name: test_meetings_is_dpl_call_spans_categories_with_no_outcome_filter
+    description: >
+      Avg DPL denominator (Celeste, 2026-10-19, HubSpot report 445533588). The report applies no
+      meeting-outcome filter and no per-deal dedup, so is_dpl_call must be TRUE for a canceled call and
+      for a repeat call on the same deal -- which is why DPL reads it alone rather than AND-ing it with
+      is_completed or is_first_call. Before this change DPL ran off is_closing_call and came out roughly
+      100 calls short of her report over a 30-day window.
+      The flag also has to cut across meeting_category: Renewal Strategy (RC), Renewal Post Webinar Call
+      (PWC), Winback Call (WB), Winback Webinar (WB_WEBINAR) and Mentor Handoff (MENTOR_HANDOFF) are all
+      DPL calls, while Renewal 3 Month (PC) and Renewal Follow-up (FOLLOW_UP) are not. Meetings 102/103
+      are a deliberately deduped pair on one deal: both must still count.
+    model: int_renewal__meetings
+    given:
+      - input: ref('stg_renewal__meetings')
+        rows:
+          - {meeting_id: 100, owner_id: '82672208', activity_type: 'Renewal Strategy', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-10-01 10:00:00"}
+          - {meeting_id: 101, owner_id: '82672208', activity_type: 'Renewal Post Webinar Call', meeting_outcome: 'NO_SHOW', meeting_start_at: "2026-10-02 10:00:00"}
+          - {meeting_id: 102, owner_id: '82672208', activity_type: 'Winback Call', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-10-03 10:00:00"}
+          - {meeting_id: 103, owner_id: '82672208', activity_type: 'Winback Call', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-10-04 10:00:00"}
+          - {meeting_id: 104, owner_id: '82672208', activity_type: 'Winback Webinar', meeting_outcome: 'CANCELED', meeting_start_at: "2026-10-05 10:00:00"}
+          - {meeting_id: 105, owner_id: '82672208', activity_type: 'Renewal 3 Month', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-10-06 10:00:00"}
+          - {meeting_id: 106, owner_id: '82672208', activity_type: 'Renewal Winback Call', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-10-07 10:00:00"}
+      - input: ref('stg_renewal__meeting_deals')
+        rows:
+          - {meeting_id: 102, deal_id: 600}
+          - {meeting_id: 103, deal_id: 600}
+      - input: ref('dim_closers')
+        rows:
+          - {owner_id: '82672208', closer_name: 'Sufijan Cunningham'}
+    expect:
+      rows:
+        - {meeting_id: 100, meeting_category: 'RC', is_first_call: true, is_dpl_call: true}
+        - {meeting_id: 101, meeting_category: 'PWC', is_first_call: true, is_dpl_call: true}
+        - {meeting_id: 102, meeting_category: 'WB', is_first_call: true, is_dpl_call: true}
+        - {meeting_id: 103, meeting_category: 'WB', is_first_call: false, is_dpl_call: true}
+        - {meeting_id: 104, meeting_category: 'WB_WEBINAR', is_first_call: true, is_dpl_call: true}
+        - {meeting_id: 105, meeting_category: 'PC', is_first_call: true, is_dpl_call: false}
+        - {meeting_id: 106, meeting_category: 'WB', is_first_call: true, is_dpl_call: false}
 
   - name: test_meetings_activity_type_casing_is_normalized
     description: >
       Regression guard for the 2026-08-28 case-variant bug. HubSpot began accepting `Renewal Follow-Up`
       (capital U) on 2026-08-24 alongside the long-standing `Renewal Follow-up`; categorizing on the raw
       string sent all 17 to meeting_category = NULL and out of the model, understating RC Completed by 9
-      and RC booked by 12 for August 2026 at the time. Both casings must behave identically -- now that
-      Renewal Follow-up is retired from RC entirely (business confirmed 2026-09-02), "identically" means
-      both casings get no meeting_category and are filtered out, same as before the fix but now on purpose
-      rather than by casing accident. Leading and trailing whitespace on other types is trimmed too.
+      and RC booked by 12 for August 2026 at the time. Both casings must behave identically. Updated
+      2026-10-19 (Celeste, Metrics Guide #2): Follow-up is no longer dropped, so "identically" now means
+      both casings land in FOLLOW_UP with is_closing_call false -- the stronger form of the guard, since
+      it checks the two casings agree on a category rather than agreeing on being discarded. Leading and
+      trailing whitespace on other types is trimmed too.
     model: int_renewal__meetings
     given:
       - input: ref('stg_renewal__meetings')
@@ -145,6 +240,8 @@ unit_tests:
           - {owner_id: '82672208', closer_name: 'Sufijan Cunningham'}
     expect:
       rows:
+        - {meeting_id: 20, meeting_category: 'FOLLOW_UP', is_completed: true, is_closing_call: false}
+        - {meeting_id: 21, meeting_category: 'FOLLOW_UP', is_completed: true, is_closing_call: false}
         - {meeting_id: 22, meeting_category: 'RC', is_completed: true, is_closing_call: true}
         - {meeting_id: 23, meeting_category: 'PC', is_completed: true, is_closing_call: false}
 

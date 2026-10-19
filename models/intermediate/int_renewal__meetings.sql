@@ -6,11 +6,26 @@
 -- string, so a re-cased duplicate of an existing type can't silently fall out of every metric. Keep every
 -- literal below lowercase, and let the unit tests feed a raw HubSpot string to exercise it.
 --
--- RC list, reconciled 2026-09-02 (business confirmed): `Renewal Follow-up` and `Renewal Strategy
--- Alignment` are retired from the RC bucket -- same treatment as the already-retired
--- `Renewal Accelerator Evergreen` -- none of the three map to any meeting_category and all get filtered
--- out of the model entirely. Locked in by the test_meetings_closing_call_flag_and_retired_activity_types
--- unit test. Only `Renewal Strategy` and `Renewal Accelerator` remain in RC.
+-- RC list, reconciled 2026-09-02 (business confirmed): `Renewal Follow-up`, `Renewal Strategy
+-- Alignment` and `Renewal Accelerator Evergreen` are all retired from the RC bucket -- none of them
+-- earn Close Rate or DPL credit, and only `Renewal Strategy` and `Renewal Accelerator` remain in RC.
+--
+-- Follow-up and Mentor Handoff restored to Call Outcomes, 2026-10-19 (Celeste, Metrics Guide #2/#3b):
+-- retiring `Renewal Follow-up` from RC also dropped it out of the model entirely, so the Call Outcomes
+-- table stopped showing calls the team had actually run (~75 completed Follow-ups in a 30-day window)
+-- and closers' activity looked lower than it was. `Mentor Handoff` had never been categorized at all.
+-- Both now get their own meeting_category -- FOLLOW_UP and MENTOR_HANDOFF -- exactly as WB_FOLLOW_UP /
+-- WB_WEBINAR do: counted on Call Outcomes, deliberately left OUT of the IN ('RC','PWC','WB') lists
+-- below so they are never first-call ranked and never earn Close Rate credit. The business reason is
+-- that neither is a renewal pitch: a Follow-up revisits a call that already happened, and a Mentor
+-- Handoff transfers the member to a mentor, so crediting either with a close would double-count the
+-- original RC. `Renewal Strategy Alignment` STAYS fully retired (Celeste, 2026-10-19) -- it was not
+-- part of this restore and still maps to no category.
+--
+-- is_dpl_call is a separate flag, NOT derived from meeting_category: Celeste's Avg DPL report
+-- 445533588 counts `mentor handoff` (MENTOR_HANDOFF) and `winback webinar` (WB_WEBINAR) alongside the
+-- RC/PWC/WB types, so the DPL denominator cuts across categories. See the dpl_call_types() macro for
+-- why it is shared with int_renewal__live_call_contacts and why there is no outcome filter or dedup.
 --
 -- is_closing_call drops a PWC from Close Rate credit when the same deal already has a completed RC
 -- that same calendar month (Travis, live) -- the credit belongs to the RC, not a repeat count. This
@@ -70,8 +85,19 @@ categorized AS (
                 THEN 'WB_FOLLOW_UP'
             WHEN LOWER(TRIM(m.activity_type)) IN ('renewal winback webinar call', 'winback webinar')
                 THEN 'WB_WEBINAR'
+            -- Call Outcomes only (Celeste, 2026-10-19). Both spellings of Follow-up exist in live
+            -- HubSpot data; LOWER(TRIM()) already collapses the Follow-up/Follow-Up casing pair, so
+            -- these two literals are the hyphen/space variants, not the casing ones.
+            WHEN LOWER(TRIM(m.activity_type)) IN ('renewal follow-up', 'renewal follow up')
+                THEN 'FOLLOW_UP'
+            WHEN LOWER(TRIM(m.activity_type)) = 'mentor handoff'
+                THEN 'MENTOR_HANDOFF'
             ELSE NULL
         END                                     AS meeting_category,
+        -- Avg DPL denominator (Celeste, 2026-10-19, HubSpot report 445533588): every call of the six
+        -- DPL types, ANY outcome, no dedup. Flagged off activity_type_key rather than meeting_category
+        -- because the six types span four categories (RC, PWC, WB, WB_WEBINAR, MENTOR_HANDOFF).
+        LOWER(TRIM(m.activity_type)) IN ({{ dpl_call_types() }})  AS is_dpl_call,
         {{ is_meeting_booked('m.meeting_outcome') }}     AS is_booked,
         {{ is_meeting_completed('m.meeting_outcome') }}  AS is_completed
     FROM meetings AS m
@@ -126,6 +152,7 @@ SELECT
     f.deal_id,
     f.is_booked,
     f.is_completed,
+    f.is_dpl_call,
     COALESCE(cr.is_first_call, TRUE) AS is_first_call,
     (
         f.meeting_category IN ('RC', 'PWC', 'WB')
