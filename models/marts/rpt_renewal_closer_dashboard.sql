@@ -51,11 +51,20 @@ deals_agg AS (
     GROUP BY 1
 ),
 
+-- Two deliberately separate denominators (2026-10-19, Celeste, Metrics Guide #10):
+--   live_meetings_mtd = is_closing_call -- completed, deduped RC/PWC/WB. Still backs live_close_pct.
+--   dpl_calls_mtd     = is_dpl_call     -- all six DPL types, any outcome, no dedup. Backs avg_dpl.
+-- They used to be one column. Celeste's Avg DPL report 445533588 has no outcome filter and no dedup,
+-- so DPL was dividing by roughly 100 fewer calls a month than she was and reading high. Live to Close %
+-- is on hold pending her changes, so live_meetings_mtd is left exactly as it was rather than being
+-- migrated along with DPL -- do not collapse these back into one column without her sign-off on both.
 meetings_agg AS (
     SELECT
         m.closer_owner_id,
         COUNT_IF(m.is_closing_call AND m.meeting_date_et BETWEEN b.mtd_start AND b.mtd_end)               AS live_meetings_mtd,
-        COUNT_IF(m.is_closing_call AND m.meeting_date_et BETWEEN b.prior_month_start AND b.prior_mtd_end) AS live_meetings_prior_mtd
+        COUNT_IF(m.is_closing_call AND m.meeting_date_et BETWEEN b.prior_month_start AND b.prior_mtd_end) AS live_meetings_prior_mtd,
+        COUNT_IF(m.is_dpl_call AND m.meeting_date_et BETWEEN b.mtd_start AND b.mtd_end)                   AS dpl_calls_mtd,
+        COUNT_IF(m.is_dpl_call AND m.meeting_date_et BETWEEN b.prior_month_start AND b.prior_mtd_end)     AS dpl_calls_prior_mtd
     FROM {{ ref('fct_renewal_meetings') }} AS m
     CROSS JOIN bounds AS b
     GROUP BY 1
@@ -75,6 +84,10 @@ final AS (
     SELECT
         cl.owner_id                                                     AS closer_owner_id,
         cl.closer_name,
+        -- MM / ACC book of business (Celeste, 2026-10-19, Metrics Guide #16). Surfaced here so the
+        -- frontend can pool the MM DPL and ACC DPL cards straight off these rows instead of joining
+        -- dim_closers a second time. Blank for Henna Shakoor (off the team, kept on the roster).
+        cl.rep_team,
         b.today_et,
         b.mtd_start,
         b.mtd_end,
@@ -93,8 +106,15 @@ final AS (
         COALESCE(da.deals_today, 0)                                     AS deals_today,
 
         COALESCE(ma.live_meetings_mtd, 0)                               AS live_meetings_mtd,
+        COALESCE(ma.dpl_calls_mtd, 0)                                   AS dpl_calls_mtd,
+        COALESCE(ma.dpl_calls_prior_mtd, 0)                             AS dpl_calls_prior_mtd,
+        -- Close % stays on live_meetings_mtd -- Live to Close % is on hold (Celeste, 2026-10-19).
         ROUND(100 * COALESCE(da.deals_won_mtd, 0) / NULLIF(ma.live_meetings_mtd, 0), 0) AS live_close_pct,
-        ROUND(COALESCE(ca.cash_mtd, 0) / NULLIF(ma.live_meetings_mtd, 0), 0)            AS avg_dpl,
+        -- Avg DPL moved onto dpl_calls_mtd on 2026-10-19: total cash over ALL calls of the six DPL
+        -- types, any outcome, no dedup, per Celeste's report 445533588. Note the report's own headline
+        -- figure (average cash per WON-deal call) was deliberately NOT adopted -- she confirmed the
+        -- team wants cash per call booked, which is this.
+        ROUND(COALESCE(ca.cash_mtd, 0) / NULLIF(ma.dpl_calls_mtd, 0), 0)                AS avg_dpl,
 
         t.goal_total_cash,
         t.goal_deals_won,

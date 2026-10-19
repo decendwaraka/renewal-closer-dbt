@@ -24,64 +24,28 @@
 -- its own "LIVE" claim above -- caught because a closer's live Nurture-stage deal count didn't match
 -- what was still sitting in the built table (deals had migrated pipelines since the last build).
 --
--- STALE AS OF 2026-08-14: the "10 actual stage IDs" below was enumerated by grouping live deal data
--- (a stage with zero deals at query time doesn't show up that way), same blind spot that caused the
--- Nurture/Redzone gap this file's dim_renewal_stages seed just got fixed for. The new pipeline's raw
--- Fivetran-synced MARKETING_DB.RAW.DEAL_PIPELINE_STAGE table lists 26 defined stages, not 10 -- including
--- a "Renewal Call Due" (1376144296) and a "Progress Call 1 Due" / "Progress Call 2 Due" pair, which may
--- make the date-based rc_due workaround below (and the still-open pc_due gap) unnecessary. Not
--- investigated further here -- scoped this pass to Nurture/Redzone only -- but worth a fresh look before
--- adding more date-based workarounds: query DEAL_PIPELINE_STAGE for the full defined stage list instead
--- of relying on which stages currently hold a deal.
+-- DUE BUCKETS REMOVED (Celeste, 2026-10-19, Metrics Guide #12). The section is now "Renewal Pipeline":
+-- current stage only, no PC Due and no RC Due columns. Both were synthetic, date-computed buckets the
+-- new Renewal Pipeline (898243912) has no real stage for -- rc_due fired 45 days before Membership
+-- Expiration Date, pc_due 15 days before the membership midpoint -- and Celeste's own report simply
+-- does not have them. Deleted rather than hidden in the frontend: they were ~130 lines of derived date
+-- logic (a 3-tier start-date COALESCE, a midpoint calculation, two stage-exclusion CTEs and a tie-break
+-- between them) whose only consumer was the two columns she dropped, and keeping dead derivations
+-- around is how they get silently rewired into something else later.
 --
--- rc_due date-based fix (2026-08-13, investigation): the new Renewal Pipeline (898243912) has no
--- "Due"-equivalent stage at all (confirmed live: its 10 actual stage IDs don't include anything Due-like),
--- so deals that migrated there were silently dropping out of rc_due entirely -- rc_due used to come purely
--- from a stage_id match against dim_renewal_stages, which only has rc_due/pc_due rows for the OLD pipeline.
--- Fixed by computing rc_due from Membership Expiration Date for the new pipeline only: a deal counts as
--- rc_due once today is within the last 45 days before that date, provided it hasn't already reached an
--- RC-or-later stage (which already has its own snapshot_col bucket above -- this is what prevents double-
--- counting the same deal in two buckets). Membership Expiration Date coverage is good for BOTH pipelines
--- live (99.5% old, 94.2% new), so unifying both onto date-based logic was an option -- deliberately not
--- taken: the old pipeline's stage-based Due tracking already works and is validated, so there's no reason
--- to touch it; only the new pipeline actually has the confirmed bug being fixed here.
+-- EXPECT NEW MEMBER TO RISE as a result, and that is correct, not a regression: pc_due/rc_due used to
+-- pull near-expiration deals OUT of their real stage bucket and re-bucket them as Due. With the Due
+-- buckets gone those deals go back to reporting under the stage they are actually sitting in, which for
+-- most of them is New Member.
 --
--- pc_due term length (Travis/Celeste decision, 2026-08-15): confirmed NOT a fixed term property --
--- terms genuinely range 6-14 months. Instead, derive the midpoint from a start date and Membership
--- Expiration Date directly: start date = Renewal - Close Date (upsell___close_date) if populated, else
--- plain Close Date (closedate). This replaces the term-length search below, which is now moot (kept
--- for the record of what was ruled out): renewal_year_count ("1st/2nd/3rd Year+" -- renewal cycle
--- number, not term length, and 100% null for the new pipeline), property_renewal_duration (only ~13%
--- populated, scattered with implausible values like 0, 51, 122, 650, 62026, 312217), payment_terms*
--- (free text / all-null), current_subscription_month (>99% null), membership_start_date (essentially 0%
--- populated), and cycle_start_date/agreement_end_date (looked promising by label -- "Term Start Date" /
--- "Drives Membership Expiring Soon tag" -- but live-checked 2026-08-15 at 28/6064 and 12/6064 populated
--- on renewal-pipeline deals, a dead end).
---
--- Start-date fallback extended to a 3rd tier (Celeste, 2026-08-16): COALESCE(upsell___close_date,
--- closedate, contact.true_renewal_close_date). Celeste's answer named the contact property as THE source,
--- but live-checked, it only covers 34% of in-scope deals standalone -- worse than the existing deal-level
--- COALESCE's 60%. It does rescue 350 deals the deal-level fields miss entirely (little overlap), so it's
--- appended as a third fallback rather than swapped in as a replacement -- pushes coverage to ~65.5%
--- (3,945/6,024). See stg_renewal__deal_contacts.sql for the contact-side join.
---
--- PC Due WINDOW -- CONFIRMED (Celeste, 2026-08-16): due starting 15 days before the midpoint, staying due
--- until the deal stage shifts to PC Invited -- no fixed upper bound. This replaces the provisional
--- symmetric +/-45d window below (kept for the record of how the width was estimated before her answer
--- arrived, since her rule is a strictly better mechanism -- "stays due" is enforced for free by this
--- model's stage-based bucketing, not a second date bound to maintain):
---   * The OLD pipeline has real Due stages, and RAW.DEAL carries per-stage DATE_ENTERED_<id>/
---     DATE_EXITED_<id>. Stage EXIT is the signal (when the team acted); stage ENTRY is useless here --
---     PC Due entry has a median of 0 days from the start date, i.e. Due is just the default landing
---     stage, not a triggered state.
---   * Method validated by a control: running it on RC Due (whose 45-day rule we already know) returned
---     a median of 44 days before expiration. Near-exact recovery, so the extraction is trustworthy.
---   * PC Due exits (n=984 in-term deals) cluster just BEFORE the midpoint: p25 5 / median 21 / p75 37
---     days before it -- worth flagging back to Celeste that a 15-day-before start is later than when the
---     team is actually shown to act (median 21 days before), but her rule is authoritative regardless.
---   * Caveats on the historical distribution above: measured on the OLD pipeline (the new one has no Due
---     stage -- the reason this is computed at all), assumes the new pipeline behaves the same, and the
---     in-term restriction dropped 984 of 1543 PC exits.
+-- NO explicit pipeline_id filter here, deliberately (checked 2026-10-19 before removing the Due CTEs).
+-- An `IN (renewal_pipeline_ids)` filter was the obvious companion to that removal, but it would have
+-- silently emptied the whole Win-Back Pipeline section: that section reads this same model for
+-- snapshot_col LIKE 'wb_%' (snowflake.server.ts), and those rows are pipeline 917643668, which is not
+-- in renewal_pipeline_ids. The INNER JOIN to dim_renewal_stages already does the scoping -- the seed
+-- contains stages for exactly the two renewal pipelines plus Win-Back and nothing else, so a deal in
+-- any other pipeline has no stage row and drops out. The Due CTEs never provided pipeline scoping
+-- either; they only ever ADDED new-pipeline rows on top of the stage join.
 --
 -- Test-contact exclusion (Sub-task 3, 2026-08-13): deals linked to a HubSpot contact with Lead Status
 -- "Internal Test Record" are excluded here at the base deal grain, so it covers every snapshot_col
@@ -93,49 +57,10 @@ WITH deals AS (
         d.closer_owner_id,
         d.pipeline_id,
         d.dealstage_id,
-        d.membership_expiration_date,
-        d.close_date,
-        d.close_date_fallback,
-        tc.contact_true_renewal_close_date,
         d.date_entered_current_stage
     FROM {{ ref('stg_renewal__deals') }} AS d
     LEFT JOIN {{ ref('stg_renewal__deal_contacts') }} AS tc ON d.deal_id = tc.deal_id
     WHERE COALESCE(tc.is_test_contact, FALSE) = FALSE
-),
-
--- PC Due midpoint (Travis/Celeste, 2026-08-15; 3rd fallback tier added 2026-08-16) -- see the pc_due
--- comment block above. Consumed by pc_due_computed further down. contact_true_renewal_close_date is a
--- real timestamp (not a midnight-anchored HubSpot date property), same convention as close_date_fallback,
--- so it uses to_et_date, not hubspot_date_to_et_date.
-pc_due_midpoint AS (
-    SELECT
-        d.deal_id,
-        COALESCE(
-            {{ hubspot_date_to_et_date('d.close_date') }},
-            {{ to_et_date('d.close_date_fallback') }},
-            {{ to_et_date('d.contact_true_renewal_close_date') }}
-        ) AS membership_start_date_et,
-        {{ hubspot_date_to_et_date('d.membership_expiration_date') }} AS membership_expiration_date_et,
-        DATEADD(
-            'day',
-            FLOOR(DATEDIFF(
-                'day',
-                COALESCE(
-                    {{ hubspot_date_to_et_date('d.close_date') }},
-                    {{ to_et_date('d.close_date_fallback') }},
-                    {{ to_et_date('d.contact_true_renewal_close_date') }}
-                ),
-                {{ hubspot_date_to_et_date('d.membership_expiration_date') }}
-            ) / 2),
-            COALESCE(
-                {{ hubspot_date_to_et_date('d.close_date') }},
-                {{ to_et_date('d.close_date_fallback') }},
-                {{ to_et_date('d.contact_true_renewal_close_date') }}
-            )
-        ) AS pc_due_midpoint_et
-    FROM deals AS d
-    WHERE COALESCE(d.close_date, d.close_date_fallback, d.contact_true_renewal_close_date) IS NOT NULL
-      AND d.membership_expiration_date IS NOT NULL
 ),
 
 stages AS (
@@ -146,79 +71,10 @@ closers AS (
     SELECT owner_id, closer_name FROM {{ ref('dim_closers') }}
 ),
 
--- New-pipeline stages that occur before the Renewal Call process starts. A deal sitting in one of these
--- is a candidate for date-based rc_due; once it reaches rc_invited/rc_scheduled/rc_not_cmplt or closes it
--- already has its own bucket below and should not also show up as still "due".
-new_pipeline_pre_rc_stages AS (
-    SELECT stage_id
-    FROM stages
-    WHERE pipeline_id = '{{ var("new_renewal_pipeline_id") }}'
-      AND snapshot_col IN ('new_member', 'pc_invited', 'pc_scheduled', 'pc_not_cmplt', 'pc_completed')
-),
-
-rc_due_computed AS (
-    SELECT
-        d.deal_id,
-        d.closer_owner_id,
-        cl.closer_name,
-        d.pipeline_id,
-        'renewal_call'  AS stage_group,
-        'rc_due'        AS snapshot_col,
-        -- The deal "enters" rc_due 45 days before expiration, not today -- so a windowed query sees
-        -- it show up on the date it actually became due, not on whatever day the dashboard is loaded.
-        DATEADD('day', -45, {{ hubspot_date_to_et_date('d.membership_expiration_date') }}) AS entry_date_et
-    FROM deals AS d
-    INNER JOIN new_pipeline_pre_rc_stages AS e ON d.dealstage_id = e.stage_id
-    INNER JOIN closers AS cl ON d.closer_owner_id = cl.owner_id
-    WHERE d.pipeline_id = '{{ var("new_renewal_pipeline_id") }}'
-      AND {{ hubspot_date_to_et_date('d.membership_expiration_date') }} IS NOT NULL
-      AND DATE(CONVERT_TIMEZONE('America/New_York', CURRENT_TIMESTAMP()))
-          BETWEEN DATEADD('day', -45, {{ hubspot_date_to_et_date('d.membership_expiration_date') }})
-              AND {{ hubspot_date_to_et_date('d.membership_expiration_date') }}
-),
-
--- New-pipeline stages that occur before the Progress Call process starts. Narrower than the rc_due
--- equivalent above on purpose: a deal that has already reached pc_invited or later has its own bucket,
--- so only new_member is a candidate for date-based pc_due.
-new_pipeline_pre_pc_stages AS (
-    SELECT stage_id
-    FROM stages
-    WHERE pipeline_id = '{{ var("new_renewal_pipeline_id") }}'
-      AND snapshot_col = 'new_member'
-),
-
--- CONFIRMED window (Celeste, 2026-08-16) -- see the PC Due WINDOW block at the top of this file. Due
--- starts 15 days before the midpoint, with NO upper date bound -- "stays due until PC Invited" is already
--- enforced by this CTE only matching deals whose CURRENT stage is still new_member (new_pipeline_pre_pc_
--- stages); once a deal's stage actually moves to pc_invited or later, it stops matching here by
--- construction and picks up its own bucket via stage_based below. rc_due wins ties: a deal inside BOTH
--- windows (past its own -15d start AND within 45 days of expiration) is the later, more urgent state, so
--- it's excluded here rather than double-bucketed.
-pc_due_computed AS (
-    SELECT
-        d.deal_id,
-        d.closer_owner_id,
-        cl.closer_name,
-        d.pipeline_id,
-        'progress_call' AS stage_group,
-        'pc_due'        AS snapshot_col,
-        -- Mirrors rc_due: the deal "enters" pc_due when the window opens (15 days before the midpoint),
-        -- not on whatever day the dashboard is loaded, so windowed queries see it on the real date.
-        DATEADD('day', -15, m.pc_due_midpoint_et) AS entry_date_et
-    FROM deals AS d
-    INNER JOIN new_pipeline_pre_pc_stages AS e ON d.dealstage_id = e.stage_id
-    INNER JOIN closers AS cl ON d.closer_owner_id = cl.owner_id
-    INNER JOIN pc_due_midpoint AS m ON d.deal_id = m.deal_id
-    WHERE d.pipeline_id = '{{ var("new_renewal_pipeline_id") }}'
-      AND d.deal_id NOT IN (SELECT deal_id FROM rc_due_computed)
-      AND DATE(CONVERT_TIMEZONE('America/New_York', CURRENT_TIMESTAMP()))
-          >= DATEADD('day', -15, m.pc_due_midpoint_et)
-),
-
--- Deals re-bucketed into rc_due_computed or pc_due_computed are excluded here so each deal lands in
--- exactly ONE snapshot_col row -- matching the old pipeline's invariant (a deal has exactly one current
--- dealstage_id, so stages partition deals with no overlap) and avoiding inflating any "Total" that sums
--- deal_count across every snapshot_col for a pipeline.
+-- Every deal lands in exactly ONE snapshot_col row: a deal has exactly one current dealstage_id, so
+-- the stage join partitions deals with no overlap. That invariant used to need two NOT IN exclusions
+-- to protect it from the Due re-bucketing; with the Due buckets gone it holds by construction, and
+-- any Total that sums deal_count across snapshot_cols is safe.
 stage_based AS (
     SELECT
         d.closer_owner_id,
@@ -231,16 +87,6 @@ stage_based AS (
     FROM deals AS d
     INNER JOIN stages AS s ON d.dealstage_id = s.stage_id
     INNER JOIN closers AS cl ON d.closer_owner_id = cl.owner_id
-    WHERE d.deal_id NOT IN (SELECT deal_id FROM rc_due_computed)
-      AND d.deal_id NOT IN (SELECT deal_id FROM pc_due_computed)
-),
-
-final AS (
-    SELECT closer_owner_id, closer_name, pipeline_id, stage_group, snapshot_col, deal_id, entry_date_et FROM stage_based
-    UNION ALL
-    SELECT closer_owner_id, closer_name, pipeline_id, stage_group, snapshot_col, deal_id, entry_date_et FROM rc_due_computed
-    UNION ALL
-    SELECT closer_owner_id, closer_name, pipeline_id, stage_group, snapshot_col, deal_id, entry_date_et FROM pc_due_computed
 )
 
-SELECT * FROM final
+SELECT * FROM stage_based

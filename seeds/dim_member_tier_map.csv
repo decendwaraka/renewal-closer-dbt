@@ -12,3 +12,7 @@ DeFi Accelerator Plus,ACC_TIER,Confirmed ACC_TIER by Celeste 2026-08-12 (33 deal
 Bronze,TERM_2,Tier-of-origin per Celeste 2026-08-12
 Gold,TERM_2,Tier-of-origin per Celeste 2026-08-12
 Platinum,TERM_2,Tier-of-origin per Celeste 2026-08-12
+Silver,TERM_2,Long Term rename 2026-10-19 (Celeste) - Silver joins Bronze/Gold/Platinum in the Long Term band; mapped ahead of the first deal so the first one does not land in UNMAPPED
+Renewal - Silver,TERM_2,Contact-side Active Product value for Silver - same shape as the other Renewal - prefixed values
+Winback - Silver,TERM_2,Contact-side Active Product value for Silver - same shape as the other Winback - prefixed values
+Renewal Gold,TERM_2,A HubSpot workflow wrote Renewal Gold instead of Gold on deal 44863017850 ($6800) - caught 2026-09-03 as UNMAPPED cash silently dropping out of Tier of Origin; mapped defensively in case the workflow repeats

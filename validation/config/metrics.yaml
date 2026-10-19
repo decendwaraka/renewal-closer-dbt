@@ -337,7 +337,10 @@ metrics:
     caveats: []
 
   - id: term2_cash
-    name: "Cash by Product -- Term 2 (B/G/P)"
+    # Renamed 2026-10-19 (Celeste, Metrics Guide #13): the dashboard column is now "Long Term (B/S/G/P)"
+    # with Silver named explicitly. Display label only -- the warehouse value stays TERM_2 and the id
+    # stays term2_cash so historical validation runs remain comparable.
+    name: "Cash by Product -- Long Term (B/S/G/P)"
     formula_refs: ["#24"]
     snowflake:
       sql: |
@@ -420,9 +423,42 @@ derived:
     name: "Team Live Close %"
     formula_refs: ["#3"]
     formula: "deals_won / (rc_completed + pwc_completed + wb_completed)"
-    caveats: ["live_meetings excludes PC (progress calls aren't 'live' closing calls) -- matches rpt_renewal_closer_dashboard.sql's meeting_category IN ('RC','PWC','WB') filter"]
+    caveats:
+      - "live_meetings excludes PC (progress calls aren't 'live' closing calls) -- matches rpt_renewal_closer_dashboard.sql's meeting_category IN ('RC','PWC','WB') filter"
+      - "Unchanged on 2026-10-19 while Avg DPL moved to its own denominator: Live to Close % is on hold pending Celeste's changes, so this still reads live_meetings_mtd (is_closing_call). The two metrics no longer share a denominator -- do not assume DPL's dpl_calls applies here."
+      - "The FOLLOW_UP and MENTOR_HANDOFF categories added 2026-10-19 are deliberately outside the IN ('RC','PWC','WB') filter, so this metric must be unchanged by that release. If it moved, the new categories leaked into is_closing_call."
 
   - id: avg_dpl
-    name: "Avg $ per Live Call (DPL)"
+    name: "Avg $ per Call Booked (DPL)"
     formula_refs: ["#4"]
-    formula: "total_cash / (rc_completed + pwc_completed + wb_completed)"
+    formula: "total_cash / dpl_calls"
+    caveats:
+      - "Denominator redefined 2026-10-19 (Celeste, HubSpot report 445533588). It is no longer rc_completed + pwc_completed + wb_completed: it is now every call of the six DPL types -- Renewal Accelerator, Renewal Strategy, Renewal Post Webinar Call, Mentor Handoff, Winback Call, Winback Webinar -- at ANY meeting outcome with NO per-deal dedup, i.e. COUNT_IF(is_dpl_call) on FCT_RENEWAL_MEETINGS. The old form reads high because it divides by roughly 100 fewer calls a month."
+      - "is_dpl_call is NOT derivable from meeting_category -- the six types span RC, PWC, WB, WB_WEBINAR and MENTOR_HANDOFF. Validate it with COUNT_IF(is_dpl_call), never by listing categories."
+      - "Report 445533588's own headline figure is average cash per WON-deal call, which is a different metric and was deliberately NOT adopted -- Celeste confirmed the team wants cash per call booked. Do not reconcile this metric against that number."
+      - "Note the legacy 'Renewal Winback Call' value is in meeting_category WB but is NOT a DPL call (only the renamed 'Winback Call' is), so wb_completed and the DPL denominator diverge on those rows by design -- same list as the Live Call Close Rate report (2026-10-18)."
+
+  - id: dpl_calls
+    name: "DPL Calls (Avg DPL denominator)"
+    formula_refs: ["#4"]
+    snowflake:
+      sql: |
+        SELECT COUNT(*) AS value
+        FROM PRODUCTION.RENEWAL_MARTS.FCT_RENEWAL_MEETINGS
+        WHERE is_dpl_call
+          AND meeting_date_et BETWEEN %(start)s AND %(end)s
+          AND (%(owner_id)s IS NULL OR closer_owner_id = %(owner_id)s)
+    hubspot:
+      object: meetings
+      aggregation: count
+      filters:
+        # No hs_meeting_outcome filter on purpose -- report 445533588 has none, and adding one here
+        # would make this validate a definition the stakeholder explicitly did not ask for.
+        - property: hs_activity_type
+          operator: IN
+          value: ["Renewal Accelerator", "Renewal Strategy", "Renewal Post Webinar Call", "Mentor Handoff", "Winback Call", "Winback Webinar"]
+        - {property: hubspot_owner_id, operator: EQ, value: ":owner_id"}
+        - {property: hs_meeting_start_time, operator: BETWEEN, value: [":start", ":end"]}
+    comparison: {mode: exact, tolerance: 0}
+    caveats:
+      - "Added 2026-10-19 alongside the Avg DPL redefinition so the new denominator is independently checkable against HubSpot rather than only inferable from the DPL ratio."

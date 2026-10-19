@@ -48,14 +48,30 @@ models:
       # one row per (meeting_id, contact_id) enforced by tests/assert_live_call_contacts_unique_pair.sql
 
   - name: fct_renewal_meetings
-    description: "Meeting-grain fact: PC/RC/PWC/WB/WB_FOLLOW_UP/WB_WEBINAR category + booked/completed flags. WB_FOLLOW_UP and WB_WEBINAR are Call Outcomes only -- never first-call ranked, never closing calls."
+    description: >
+      Meeting-grain fact: PC/RC/PWC/WB/WB_FOLLOW_UP/WB_WEBINAR/FOLLOW_UP/MENTOR_HANDOFF category +
+      booked/completed flags. WB_FOLLOW_UP, WB_WEBINAR, FOLLOW_UP and MENTOR_HANDOFF are Call Outcomes
+      only -- never first-call ranked, never closing calls. is_dpl_call is the Avg DPL denominator and
+      is independent of meeting_category (Celeste, 2026-10-19).
     columns:
       - name: meeting_id
         tests: [unique, not_null]
       - name: meeting_category
         tests:
           - accepted_values:
-              values: ['PC', 'RC', 'PWC', 'WB', 'WB_FOLLOW_UP', 'WB_WEBINAR']
+              # FOLLOW_UP and MENTOR_HANDOFF added 2026-10-19 (Celeste, Metrics Guide #2/#3b): both are
+              # Call Outcomes only. CI runs `dbt run` and never `dbt test`, so this list is only a guard
+              # when someone runs the suite locally -- keep it in sync by hand with the CASE in
+              # int_renewal__meetings.sql.
+              values: ['PC', 'RC', 'PWC', 'WB', 'WB_FOLLOW_UP', 'WB_WEBINAR', 'FOLLOW_UP', 'MENTOR_HANDOFF']
+      - name: is_dpl_call
+        description: >
+          Avg DPL denominator (Celeste, 2026-10-19, HubSpot report 445533588): TRUE for every call of
+          the six types in the dpl_call_types() macro, at ANY outcome, with no per-deal dedup. Read it
+          alone -- AND-ing it with is_completed or is_first_call reimposes the filtering her report does
+          not do. It is NOT derivable from meeting_category: the six types span RC, PWC, WB, WB_WEBINAR
+          and MENTOR_HANDOFF.
+        tests: [not_null]
       - name: is_first_call
         description: "First completed call per (deal_id, meeting_category) -- OPEN_ISSUES #23. DPL/Close Rate should filter on this; Call Outcomes counts intentionally don't. ALWAYS read it as `is_completed AND is_first_call`: non-completed calls are never ranked and fall through to TRUE, so on its own the flag makes a canceled call look like an un-deduped follow-up."
         # one-first-call-per-(deal, category) enforced by tests/assert_first_call_dedup.sql
@@ -77,7 +93,17 @@ models:
                 - 'SCHEDULED'
 
   - name: fct_renewal_pipeline_snapshot
-    description: "Per-closer deal-stage fact (#36-#51): one row per (deal, current snapshot_col bucket), dated by entry_date_et so any date window can be applied downstream -- deals that entered their current stage during the selected range. rc_due's entry_date_et is date-computed (45 days before Membership Expiration Date) for the new Renewal Pipeline (898243912) only; pc_due's entry_date_et is 15 days before the deal's own start/expiration midpoint, with no upper bound -- stays due until the deal's stage actually shifts to PC Invited (Celeste, 2026-08-16). Both date-based buckets are new-Renewal-Pipeline only; per-stage date_entered_current_stage elsewhere. Excludes deals linked to Internal Test contacts."
+    description: >
+      Per-closer deal-stage fact (#36-#51): one row per (deal, current snapshot_col bucket), dated by
+      entry_date_et so any date window can be applied downstream -- deals that entered their current
+      stage during the selected range. Every bucket comes from the deal's CURRENT dealstage_id mapped
+      through dim_renewal_stages, dated by hs_v2_date_entered_current_stage. Excludes deals linked to
+      Internal Test contacts. Feeds both the Renewal Pipeline section and the Win-Back Pipeline
+      section (the latter reads snapshot_col LIKE 'wb_%').
+      2026-10-19 (Celeste, Metrics Guide #12): the pc_due and rc_due buckets are gone, along with the
+      date-derivation behind them -- her report shows current stage only. Expect New Member to rise:
+      those buckets used to pull near-expiration deals out of their real stage.
+
     columns:
       - name: deal_id
         tests: [not_null]
@@ -221,32 +247,21 @@ unit_tests:
       rows:
         - {closer_owner_id: '82672208', closer_name: 'Sufijan Cunningham', pipeline_id: '95211801', stage_group: 'progress_call', snapshot_col: 'pc_scheduled', deal_id: 2, entry_date_et: '2026-06-18'}
 
-  - name: test_pipeline_snapshot_rc_due_entry_date_is_45_days_before_expiration
-    description: "New-pipeline rc_due is a synthetic bucket (no stage-based Due equivalent exists there) -- entry_date_et is computed as 45 days before Membership Expiration Date, not the day the dashboard happens to load, so it windows like every other bucket."
+  - name: test_pipeline_snapshot_has_no_due_buckets
+    description: >
+      Replaces the five pc_due / rc_due tests deleted on 2026-10-19 (Celeste, Metrics Guide #12). The
+      Due buckets were synthetic and date-derived -- rc_due fired 45 days before Membership Expiration
+      Date, pc_due 15 days before the membership midpoint -- and her Renewal Pipeline report has no
+      such columns. This test is the guard that they stay gone: the fixture deal is a new-pipeline
+      deal sitting in new_member with BOTH a close date and a near-term membership_expiration_date, so
+      under the old logic it would have been pulled out of new_member and re-bucketed as rc_due. It
+      must now stay in new_member, dated by its own date_entered_current_stage. That is the expected
+      New Member rise, not a regression -- deals report under the stage they are actually in.
     model: fct_renewal_pipeline_snapshot
     given:
       - input: ref('stg_renewal__deals')
         rows:
-          - {deal_id: 1, closer_owner_id: '82672208', pipeline_id: '898243912', dealstage_id: '1359841792', membership_expiration_date: '2026-09-05'}
-      - input: ref('dim_renewal_stages')
-        rows:
-          - {stage_id: '1359841792', pipeline_id: '898243912', stage_group: 'renewal_pipeline', snapshot_col: 'pc_invited'}
-      - input: ref('dim_closers')
-        rows:
-          - {owner_id: '82672208', closer_name: 'Sufijan Cunningham'}
-      - input: ref('stg_renewal__deal_contacts')
-        rows: []
-    expect:
-      rows:
-        - {closer_owner_id: '82672208', closer_name: 'Sufijan Cunningham', pipeline_id: '898243912', stage_group: 'renewal_call', snapshot_col: 'rc_due', deal_id: 1, entry_date_et: '2026-07-22'}
-
-  - name: test_pipeline_snapshot_pc_due_entry_date_is_15_days_before_midpoint
-    description: "New-pipeline pc_due is a synthetic bucket like rc_due -- entry_date_et is 15 days before the membership midpoint (Celeste, 2026-08-16), where midpoint = halfway between the start date (Renewal - Close Date, else Close Date, else contact true_renewal_close_date) and Membership Expiration Date. Fixture: 2026-02-15 to 2027-02-15 (365d) -> midpoint 2026-08-16 -> entry 2026-08-01. NOT time-dependent like the old +/-45 version: there's no upper bound anymore (see the no-upper-bound test below), so once today passes the entry date this fixture keeps matching forever."
-    model: fct_renewal_pipeline_snapshot
-    given:
-      - input: ref('stg_renewal__deals')
-        rows:
-          - {deal_id: 1, closer_owner_id: '82672208', pipeline_id: '898243912', dealstage_id: '1359829634', close_date: '2026-02-15', membership_expiration_date: '2027-02-15'}
+          - {deal_id: 1, closer_owner_id: '82672208', pipeline_id: '898243912', dealstage_id: '1359829634', close_date: '2026-02-15', membership_expiration_date: '2026-11-01', date_entered_current_stage: '2026-10-01T18:00:00'}
       - input: ref('dim_renewal_stages')
         rows:
           - {stage_id: '1359829634', pipeline_id: '898243912', stage_group: 'renewal_pipeline', snapshot_col: 'new_member'}
@@ -257,62 +272,4 @@ unit_tests:
         rows: []
     expect:
       rows:
-        - {closer_owner_id: '82672208', closer_name: 'Sufijan Cunningham', pipeline_id: '898243912', stage_group: 'progress_call', snapshot_col: 'pc_due', deal_id: 1, entry_date_et: '2026-08-01'}
-
-  - name: test_pipeline_snapshot_pc_due_has_no_upper_bound
-    description: "Confirms the old provisional +45d upper bound is gone (Celeste, 2026-08-16): a deal whose midpoint was years ago, and which is still sitting in new_member (never advanced to PC Invited), still shows up as pc_due today -- 'stays due until PC Invited' is a stage check, not a second date bound. Fixture: 2020-01-01 to 2021-01-01 (366d) -> midpoint 2020-07-02 -> entry 2020-06-17, long past any +45d cutoff the old rule would have applied."
-    model: fct_renewal_pipeline_snapshot
-    given:
-      - input: ref('stg_renewal__deals')
-        rows:
-          - {deal_id: 1, closer_owner_id: '82672208', pipeline_id: '898243912', dealstage_id: '1359829634', close_date: '2020-01-01', membership_expiration_date: '2021-01-01'}
-      - input: ref('dim_renewal_stages')
-        rows:
-          - {stage_id: '1359829634', pipeline_id: '898243912', stage_group: 'renewal_pipeline', snapshot_col: 'new_member'}
-      - input: ref('dim_closers')
-        rows:
-          - {owner_id: '82672208', closer_name: 'Sufijan Cunningham'}
-      - input: ref('stg_renewal__deal_contacts')
-        rows: []
-    expect:
-      rows:
-        - {closer_owner_id: '82672208', closer_name: 'Sufijan Cunningham', pipeline_id: '898243912', stage_group: 'progress_call', snapshot_col: 'pc_due', deal_id: 1, entry_date_et: '2020-06-17'}
-
-  - name: test_pipeline_snapshot_pc_due_midpoint_falls_back_to_contact_true_renewal_close_date
-    description: "PC Due's 3rd start-date fallback tier (Celeste, 2026-08-16, OPEN_ISSUES #24): when both deal-level fields (Renewal - Close Date, Close Date) are blank, the contact's true_renewal_close_date (joined via stg_renewal__deal_contacts) is used instead, so the deal still gets a midpoint rather than being dropped from pc_due entirely. Same 2026-02-15 -> 2027-02-15 midpoint/entry math as the first pc_due test above, just sourced from the contact instead of the deal."
-    model: fct_renewal_pipeline_snapshot
-    given:
-      - input: ref('stg_renewal__deals')
-        rows:
-          - {deal_id: 1, closer_owner_id: '82672208', pipeline_id: '898243912', dealstage_id: '1359829634', membership_expiration_date: '2027-02-15'}
-      - input: ref('dim_renewal_stages')
-        rows:
-          - {stage_id: '1359829634', pipeline_id: '898243912', stage_group: 'renewal_pipeline', snapshot_col: 'new_member'}
-      - input: ref('dim_closers')
-        rows:
-          - {owner_id: '82672208', closer_name: 'Sufijan Cunningham'}
-      - input: ref('stg_renewal__deal_contacts')
-        rows:
-          - {deal_id: 1, contact_true_renewal_close_date: '2026-02-15T00:00:00'}
-    expect:
-      rows:
-        - {closer_owner_id: '82672208', closer_name: 'Sufijan Cunningham', pipeline_id: '898243912', stage_group: 'progress_call', snapshot_col: 'pc_due', deal_id: 1, entry_date_et: '2026-08-01'}
-
-  - name: test_pipeline_snapshot_rc_due_wins_when_deal_is_in_both_due_windows
-    description: "A deal can satisfy the pc_due midpoint window AND the rc_due pre-expiration window at once (short term, expiration near the midpoint). rc_due is the later, more urgent state and must win, so the deal lands in exactly ONE row -- otherwise it double-counts in any Total that sums deal_count across snapshot_cols. Fixture: 2026-07-25 to 2026-09-05 (42d) -> midpoint 2026-08-15, both windows contain mid-Aug 2026. TIME-DEPENDENT via rc_due's own bound only (pc_due no longer has an upper bound): this stops matching once today passes 2026-09-05, since rc_due would then stop firing and the deal would fall to pc_due instead -- needs bumping past that date."
-    model: fct_renewal_pipeline_snapshot
-    given:
-      - input: ref('stg_renewal__deals')
-        rows:
-          - {deal_id: 1, closer_owner_id: '82672208', pipeline_id: '898243912', dealstage_id: '1359829634', close_date: '2026-07-25', membership_expiration_date: '2026-09-05'}
-      - input: ref('dim_renewal_stages')
-        rows:
-          - {stage_id: '1359829634', pipeline_id: '898243912', stage_group: 'renewal_pipeline', snapshot_col: 'new_member'}
-      - input: ref('dim_closers')
-        rows:
-          - {owner_id: '82672208', closer_name: 'Sufijan Cunningham'}
-      - input: ref('stg_renewal__deal_contacts')
-        rows: []
-    expect:
-      rows:
-        - {closer_owner_id: '82672208', closer_name: 'Sufijan Cunningham', pipeline_id: '898243912', stage_group: 'renewal_call', snapshot_col: 'rc_due', deal_id: 1, entry_date_et: '2026-07-22'}
+        - {closer_owner_id: '82672208', closer_name: 'Sufijan Cunningham', pipeline_id: '898243912', stage_group: 'renewal_pipeline', snapshot_col: 'new_member', deal_id: 1, entry_date_et: '2026-10-01'}
