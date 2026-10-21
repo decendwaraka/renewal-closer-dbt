@@ -49,6 +49,19 @@ models:
         tests: [not_null]
       # one row per (meeting_id, contact_id) enforced by tests/assert_live_call_contacts_unique_pair.sql
 
+  - name: fct_renewal_pc_close_deals
+    description: "(deal, qualifying meeting)-grain fact behind PC Close % in Call Outcomes, replicating HubSpot report 445343752 (Celeste, 2026-10-21). Qualifying deal = never entered Renewal Call Complete - Nurture / Renewal Call Invited / Scheduled (either pipeline) with at least one COMPLETED Renewal 3 Month or Renewal Accelerator 3 month meeting linked to the deal or its contact. Dated by meeting_date_et (approved window; NOT Renewal Close Date). PC Close % = COUNT(DISTINCT IFF(is_won, deal_id, NULL)) / COUNT(DISTINCT deal_id) over the window; attributed to the deal owner; closer_name IS NULL = off-roster or unassigned owner. No pipeline filter and no Post Webinar 30d flag (always 0 on these meetings)."
+    columns:
+      - name: deal_id
+        tests: [not_null]
+      - name: meeting_id
+        tests: [not_null]
+      - name: meeting_date_et
+        tests: [not_null]
+      - name: is_won
+        tests: [not_null]
+      # one row per (deal_id, meeting_id) enforced by tests/assert_pc_close_deals_unique_pair.sql
+
   - name: fct_renewal_meetings
     description: >
       Meeting-grain fact: PC/RC/PWC/WB/WB_FOLLOW_UP/WB_WEBINAR/FOLLOW_UP/MENTOR_HANDOFF category +

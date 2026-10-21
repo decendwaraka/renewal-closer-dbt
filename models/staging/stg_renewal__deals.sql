@@ -116,6 +116,19 @@ renamed AS (
         CASE WHEN deal_pipeline_id::VARCHAR = '{{ var("new_renewal_pipeline_id") }}'
              THEN property_hs_v_2_date_entered_1359841801 ELSE property_hs_v_2_date_entered_186350393 END AS date_entered_rc_scheduled,
 
+        -- "Has EVER been in" any stage HubSpot report 445343752 (PC Close %) excludes: Renewal Call
+        -- Complete - Nurture (200616252, old pipeline only), and Renewal Call Invited / Scheduled in the
+        -- old pipeline (240516942 / 186350393) and the new one (1359841800 / 1359841801). Deliberately
+        -- reads ALL five raw columns rather than the pipeline-picked date_entered_* above: the report's
+        -- "has never been any of" filter spans both pipelines, and HubSpot never clears the old
+        -- pipeline's stamp after migration, so a migrated deal that sat in an old stage still counts.
+        -- Reproduces the report: 2,247 deals / 161 won vs its 2,246 / 161 (2026-10-21).
+        (property_hs_v_2_date_entered_200616252 IS NOT NULL
+            OR property_hs_v_2_date_entered_240516942 IS NOT NULL
+            OR property_hs_v_2_date_entered_186350393 IS NOT NULL
+            OR property_hs_v_2_date_entered_1359841800 IS NOT NULL
+            OR property_hs_v_2_date_entered_1359841801 IS NOT NULL) AS ever_entered_pc_close_excluded_stage,
+
         -- Generic "date entered whatever stage the deal is CURRENTLY in" (HubSpot system property,
         -- confirmed live 100% populated across all 3 pipelines incl. Win-Back, which has no per-stage
         -- date_entered_<id> columns of its own). Since Pipeline Snapshot already buckets each deal by
