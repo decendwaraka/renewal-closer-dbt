@@ -127,9 +127,10 @@ def sum_dated_components(object_type, filters, components, start_et, end_et):
     """Sum component amounts whose own stamped date falls in [start_et, end_et].
 
     `components` is a list of {"amount_prop": ..., "date_prop": ...} dicts --
-    mirrors int_renewal__deal_cash.sql's per-component date bucketing (each
-    cash component is dated by its own stamped-date field, not the deal's
-    close date). Returns (total, matched_record_count).
+    mirrors int_renewal__deal_cash.sql's per-component date bucketing: base cash
+    by the deal's Renewal Close Date, each additional payment by its own
+    Collected Date. A component with no date is skipped, as in the model
+    (Celeste, 2026-10-21). Returns (total, matched_record_count).
     """
     props = []
     for c in components:

@@ -4,7 +4,7 @@ models:
   - name: int_renewal__won_deals
     description: "Closed-won renewal deals owned by a current closer, with ET close date and cash inputs."
   - name: int_renewal__deal_cash
-    description: "Cash exploded to (deal, component) grain: base Cash Collected plus additional payments AP1-AP12, EVERY component dated at the deal's Renewal Close Date (changed 2026-10-19 to match the HubSpot 'Total Cash Collected (All Payments)' report). A payment collected after the close month therefore counts in the close month."
+    description: "Cash exploded to (deal, component) grain: base Cash Collected dated at the deal's Renewal Close Date, additional payments AP1-AP12 each dated at their own Collected Date (approved by Celeste 2026-10-21, all historical months). Only additional payments with a Collected Date count."
   - name: int_renewal__meetings
     description: >
       Renewal meetings categorized PC/RC/PWC/WB (plus WB_FOLLOW_UP and WB_WEBINAR, Call Outcomes only
@@ -24,33 +24,35 @@ models:
     description: "One row per (meeting_id, contact_id) for COMPLETED closer-owned live calls, matching the team's HubSpot 'Live to Close Rate' report (2026-10-18). Types: Renewal Accelerator, Renewal Strategy, Renewal Post Webinar Call, Mentor Handoff, Winback Call, Winback Webinar -- legacy Renewal Winback Call excluded. is_won_after_meeting = the contact has any closed-won deal (renewal or win-back stage, any owner) with close date on or after the meeting date, no upper bound. Close Rate = COUNT(DISTINCT won contacts) / COUNT(DISTINCT contacts) over the window, counted at query time."
 
 unit_tests:
-  - name: test_deal_cash_dates_every_payment_at_the_deal_close_date
+  - name: test_deal_cash_dates_base_at_close_and_payments_at_collected_date
     description: >
-      Changed 2026-10-19 to match the HubSpot "Total Cash Collected (All Payments)" report, which sums a
-      deal's base cash and all its additional payments and files the total under the deal's Renewal Close
-      Date. Deal 1 closed Sep 12 with an additional payment collected Oct 3: both rows are dated Sep 12
-      (they used to be Sep 12 and Oct 3). Deal 2's additional payment has an amount but no collected date
-      -- it used to be dropped and is now counted, as the report counts it. Deal 3 has no close date, so
-      there is nothing to bucket it by and it contributes no rows. Zero-amount components make no row.
+      Approved definition (Celeste Magre, 2026-10-21): base Cash Collected is dated at the deal's
+      Renewal Close Date and every additional payment at its own Collected Date. Deal 1 closed Sep 12
+      with an additional payment collected Oct 3: base is Sep 12, the payment is Oct 3. Deal 2's
+      additional payment has an amount but no Collected Date, so it makes no row (only payments with the
+      date filled in count). Deal 3 has no Renewal Close Date: no base row, but its dated additional
+      payment still counts on its collected date. Deal 4's additional payment is $0 and makes no row.
       The input is fed as SQL because int_renewal__won_deals is ephemeral (dbt cannot introspect a
-      relation that does not exist); the stamped-date columns are omitted on purpose -- the model no
-      longer reads them, which is itself part of what this test pins.
+      relation that does not exist).
     model: int_renewal__deal_cash
     given:
       - input: ref('int_renewal__won_deals')
         format: sql
         rows: |
-          select 1 as deal_id, '82672208' as closer_owner_id, cast('2026-09-12' as date) as close_date_et, cast(10000 as float) as cash_collected, cast(2500 as float) as ap1_amount, cast(0 as float) as ap2_amount, cast(0 as float) as ap3_amount, cast(0 as float) as ap4_amount, cast(0 as float) as ap5_amount, cast(0 as float) as ap6_amount, cast(0 as float) as ap7_amount, cast(0 as float) as ap8_amount, cast(0 as float) as ap9_amount, cast(0 as float) as ap10_amount, cast(0 as float) as ap11_amount, cast(0 as float) as ap12_amount
+          select 1 as deal_id, '82672208' as closer_owner_id, cast('2026-09-12' as date) as close_date_et, cast(10000 as float) as cash_collected, cast(2500 as float) as ap1_amount, cast(0 as float) as ap2_amount, cast(0 as float) as ap3_amount, cast(0 as float) as ap4_amount, cast(0 as float) as ap5_amount, cast(0 as float) as ap6_amount, cast(0 as float) as ap7_amount, cast(0 as float) as ap8_amount, cast(0 as float) as ap9_amount, cast(0 as float) as ap10_amount, cast(0 as float) as ap11_amount, cast(0 as float) as ap12_amount, cast('2026-10-03' as timestamp) as ap1_stamped_at, cast(null as timestamp) as ap2_stamped_at, cast(null as timestamp) as ap3_stamped_at, cast(null as timestamp) as ap4_stamped_at, cast(null as timestamp) as ap5_stamped_at, cast(null as timestamp) as ap6_stamped_at, cast(null as timestamp) as ap7_stamped_at, cast(null as timestamp) as ap8_stamped_at, cast(null as timestamp) as ap9_stamped_at, cast(null as timestamp) as ap10_stamped_at, cast(null as timestamp) as ap11_stamped_at, cast(null as timestamp) as ap12_stamped_at
           union all
-          select 2 as deal_id, '82672208' as closer_owner_id, cast('2026-09-20' as date) as close_date_et, cast(6800 as float) as cash_collected, cast(0 as float) as ap1_amount, cast(1200 as float) as ap2_amount, cast(0 as float) as ap3_amount, cast(0 as float) as ap4_amount, cast(0 as float) as ap5_amount, cast(0 as float) as ap6_amount, cast(0 as float) as ap7_amount, cast(0 as float) as ap8_amount, cast(0 as float) as ap9_amount, cast(0 as float) as ap10_amount, cast(0 as float) as ap11_amount, cast(0 as float) as ap12_amount
+          select 2 as deal_id, '82672208' as closer_owner_id, cast('2026-09-20' as date) as close_date_et, cast(6800 as float) as cash_collected, cast(0 as float) as ap1_amount, cast(1200 as float) as ap2_amount, cast(0 as float) as ap3_amount, cast(0 as float) as ap4_amount, cast(0 as float) as ap5_amount, cast(0 as float) as ap6_amount, cast(0 as float) as ap7_amount, cast(0 as float) as ap8_amount, cast(0 as float) as ap9_amount, cast(0 as float) as ap10_amount, cast(0 as float) as ap11_amount, cast(0 as float) as ap12_amount, cast(null as timestamp) as ap1_stamped_at, cast(null as timestamp) as ap2_stamped_at, cast(null as timestamp) as ap3_stamped_at, cast(null as timestamp) as ap4_stamped_at, cast(null as timestamp) as ap5_stamped_at, cast(null as timestamp) as ap6_stamped_at, cast(null as timestamp) as ap7_stamped_at, cast(null as timestamp) as ap8_stamped_at, cast(null as timestamp) as ap9_stamped_at, cast(null as timestamp) as ap10_stamped_at, cast(null as timestamp) as ap11_stamped_at, cast(null as timestamp) as ap12_stamped_at
           union all
-          select 3 as deal_id, '82672208' as closer_owner_id, cast(null as date) as close_date_et, cast(5000 as float) as cash_collected, cast(500 as float) as ap1_amount, cast(0 as float) as ap2_amount, cast(0 as float) as ap3_amount, cast(0 as float) as ap4_amount, cast(0 as float) as ap5_amount, cast(0 as float) as ap6_amount, cast(0 as float) as ap7_amount, cast(0 as float) as ap8_amount, cast(0 as float) as ap9_amount, cast(0 as float) as ap10_amount, cast(0 as float) as ap11_amount, cast(0 as float) as ap12_amount
+          select 3 as deal_id, '82672208' as closer_owner_id, cast(null as date) as close_date_et, cast(5000 as float) as cash_collected, cast(500 as float) as ap1_amount, cast(0 as float) as ap2_amount, cast(0 as float) as ap3_amount, cast(0 as float) as ap4_amount, cast(0 as float) as ap5_amount, cast(0 as float) as ap6_amount, cast(0 as float) as ap7_amount, cast(0 as float) as ap8_amount, cast(0 as float) as ap9_amount, cast(0 as float) as ap10_amount, cast(0 as float) as ap11_amount, cast(0 as float) as ap12_amount, cast('2026-08-15' as timestamp) as ap1_stamped_at, cast(null as timestamp) as ap2_stamped_at, cast(null as timestamp) as ap3_stamped_at, cast(null as timestamp) as ap4_stamped_at, cast(null as timestamp) as ap5_stamped_at, cast(null as timestamp) as ap6_stamped_at, cast(null as timestamp) as ap7_stamped_at, cast(null as timestamp) as ap8_stamped_at, cast(null as timestamp) as ap9_stamped_at, cast(null as timestamp) as ap10_stamped_at, cast(null as timestamp) as ap11_stamped_at, cast(null as timestamp) as ap12_stamped_at
+          union all
+          select 4 as deal_id, '82672208' as closer_owner_id, cast('2026-10-02' as date) as close_date_et, cast(4800 as float) as cash_collected, cast(0 as float) as ap1_amount, cast(0 as float) as ap2_amount, cast(0 as float) as ap3_amount, cast(0 as float) as ap4_amount, cast(0 as float) as ap5_amount, cast(0 as float) as ap6_amount, cast(0 as float) as ap7_amount, cast(0 as float) as ap8_amount, cast(0 as float) as ap9_amount, cast(0 as float) as ap10_amount, cast(0 as float) as ap11_amount, cast(0 as float) as ap12_amount, cast(null as timestamp) as ap1_stamped_at, cast(null as timestamp) as ap2_stamped_at, cast('2026-10-05' as timestamp) as ap3_stamped_at, cast(null as timestamp) as ap4_stamped_at, cast(null as timestamp) as ap5_stamped_at, cast(null as timestamp) as ap6_stamped_at, cast(null as timestamp) as ap7_stamped_at, cast(null as timestamp) as ap8_stamped_at, cast(null as timestamp) as ap9_stamped_at, cast(null as timestamp) as ap10_stamped_at, cast(null as timestamp) as ap11_stamped_at, cast(null as timestamp) as ap12_stamped_at
     expect:
       rows:
         - {deal_id: 1, cash_component: 'base', cash_date_et: "2026-09-12", cash_amount: 10000}
-        - {deal_id: 1, cash_component: 'ap1', cash_date_et: "2026-09-12", cash_amount: 2500}
+        - {deal_id: 1, cash_component: 'ap1', cash_date_et: "2026-10-03", cash_amount: 2500}
         - {deal_id: 2, cash_component: 'base', cash_date_et: "2026-09-20", cash_amount: 6800}
-        - {deal_id: 2, cash_component: 'ap2', cash_date_et: "2026-09-20", cash_amount: 1200}
+        - {deal_id: 3, cash_component: 'ap1', cash_date_et: "2026-08-15", cash_amount: 500}
+        - {deal_id: 4, cash_component: 'base', cash_date_et: "2026-10-02", cash_amount: 4800}
 
   - name: test_live_call_contacts_types_outcome_and_won_after_meeting
     description: >

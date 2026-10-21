@@ -1,13 +1,17 @@
 name: dbt run (prod)
 
-# Refreshes PRODUCTION.RENEWAL_* every 2 hours. Cron is UTC.
-# Also runnable on demand from the Actions tab.
+# Refreshes PRODUCTION.RENEWAL_* every 2 hours (cron is UTC), on every merge to main so model
+# changes go live right away, and on demand from the Actions tab.
 on:
+  push:
+    branches: [main]
   schedule:
     - cron: "0 */2 * * *"
   workflow_dispatch:
 
-# Never let two prod runs overlap; let a running run finish rather than cancel it.
+# Never let two prod runs overlap; let a running run finish rather than cancel it. GitHub keeps at
+# most one run pending per group, so back-to-back merges collapse into one follow-up run - which
+# checks out main's tip (below), so it includes every merge.
 concurrency:
   group: dbt-prod
   cancel-in-progress: false
@@ -25,7 +29,12 @@ jobs:
       SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
       SNOWFLAKE_PRIVATE_KEY_PATH: ${{ github.workspace }}/rsa_key.p8
     steps:
+      # Always run the latest main, never the triggering commit: a run that sat queued behind
+      # another would otherwise deploy a stale SHA, and a manual dispatch from a feature branch
+      # would push unmerged models to prod.
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - uses: actions/setup-python@v5
         with:

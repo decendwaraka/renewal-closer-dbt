@@ -73,16 +73,24 @@ metrics:
         - {property: pipeline, operator: IN, value: ["95211801", "898243912", "917643668"]}
         - {property: dealstage, operator: IN, value: ["175346331", "229787714", "1359841456", "1401758776"]}
         - {property: hubspot_owner_id, operator: EQ, value: ":owner_id"}
-      components:   # each dated by its OWN stamped date, not close date -- mirrors int_renewal__deal_cash.sql
-        - {amount_prop: cash_collected, date_prop: upsell___close_date}                                  # CONFIRM: base cash component's own "date" is deal close date in the dbt model
-        - {amount_prop: additional_payment_1_amount, date_prop: additional_payment_1_stamped_date}       # CONFIRM
-        - {amount_prop: additional_payment_2_amount, date_prop: additional_payment_2_stamped_date}       # CONFIRM
-        - {amount_prop: collected_amount__additional_payment_3, date_prop: collected_date__additional_payment_3}  # CONFIRM
-        - {amount_prop: collected_amount__additional_payment_4, date_prop: collected_date__additional_payment_4}  # CONFIRM
+      components:   # base at the deal's Renewal Close Date, each additional payment at its own Collected Date (Celeste, 2026-10-21); a payment with no date is skipped. HubSpot internal names, verified live 2026-10-21
+        - {amount_prop: cash_collected, date_prop: upsell___close_date}
+        - {amount_prop: additional_payment__1_amount, date_prop: additional_payment__1_stamped_date}
+        - {amount_prop: additional_payment__2_amount, date_prop: additional_payment__2_stamped_date}
+        - {amount_prop: collected_amount__additional_payment_3, date_prop: collected_date_additional_payment_3}
+        - {amount_prop: collected_amount__additional_payment_4, date_prop: collected_date_additional_payment_4}
+        - {amount_prop: collected_amount__additional_payment_5, date_prop: collected_date_additional_payment_5}
+        - {amount_prop: collected_amount__additional_payment_6, date_prop: collected_date_additional_payment_6}
+        - {amount_prop: collected_amount__additional_payment_7, date_prop: collected_date_additional_payment_7}
+        - {amount_prop: collected_amount__additional_payment_8, date_prop: collected_date_additional_payment_8}
+        - {amount_prop: collected_amount__additional_payment_9, date_prop: collected_date_additional_payment_9}
+        - {amount_prop: collected_amount__additional_payment_10, date_prop: collected_date_additional_payment_10}
+        - {amount_prop: collected_amount__additional_payment_11, date_prop: collected_date_additional_payment_11}
+        - {amount_prop: collected_amount__additional_payment_12, date_prop: collected_date_additional_payment_12}
     comparison: {mode: exact, tolerance: 1.00}
     caveats:
-      - "base+AP1+AP2+AP3+AP4 only -- NO LONGER 0-populated for AP5+: AP5 went live and populated 2026-09-01 ($2,783.33 across 3 deals, see int_renewal__deal_cash.sql), so this config now undercounts. AP6-12 remain 0-populated until Fivetran syncs each index; re-verify before trusting this list, and add AP5's amount/date property pair here once confirmed live in HubSpot."
-      - "AP1/AP2 property names use a different naming pattern than AP3/AP4 in live HubSpot -- both are Fivetran staging-alias guesses, confirm both patterns independently"
+      - "All 13 components wired (base + AP1-AP12). AP7-AP12 exist in HubSpot but not yet in Snowflake (Fivetran has not created the columns); all are $0 for 2026 so far, so a non-zero here means cash entered in an index dbt cannot see yet."
+      - "AP1/AP2 use additional_payment__N_amount / additional_payment__N_stamped_date (double underscore); AP3+ use collected_amount__additional_payment_N / collected_date_additional_payment_N (note: no double underscore in the date name)."
 
   # --- Call Outcomes (#10-21, #52-57 for PC/RC/PWC; #69-74 for Win-Back) ---
   # invited/booked are DEAL-STAGE-BASIS per OPEN_ISSUES #17 (dashboard moved off the
@@ -297,12 +305,20 @@ metrics:
           operator: IN
           value: ["Renewal - Accelerator Gems", "Renewal - Accelerator Plus", "Renewal - Accelerator DIY",
                    "Upgrade DIY to Acc Plus", "Upgrade DIY to Acc Gems", "Winback - Acc Plus", "Winback - Acc Gems"]
-      components:
+      components:   # base at the deal's Renewal Close Date, each additional payment at its own Collected Date (Celeste, 2026-10-21); a payment with no date is skipped. HubSpot internal names, verified live 2026-10-21
         - {amount_prop: cash_collected, date_prop: upsell___close_date}
-        - {amount_prop: additional_payment_1_amount, date_prop: additional_payment_1_stamped_date}
-        - {amount_prop: additional_payment_2_amount, date_prop: additional_payment_2_stamped_date}
-        - {amount_prop: collected_amount__additional_payment_3, date_prop: collected_date__additional_payment_3}
-        - {amount_prop: collected_amount__additional_payment_4, date_prop: collected_date__additional_payment_4}
+        - {amount_prop: additional_payment__1_amount, date_prop: additional_payment__1_stamped_date}
+        - {amount_prop: additional_payment__2_amount, date_prop: additional_payment__2_stamped_date}
+        - {amount_prop: collected_amount__additional_payment_3, date_prop: collected_date_additional_payment_3}
+        - {amount_prop: collected_amount__additional_payment_4, date_prop: collected_date_additional_payment_4}
+        - {amount_prop: collected_amount__additional_payment_5, date_prop: collected_date_additional_payment_5}
+        - {amount_prop: collected_amount__additional_payment_6, date_prop: collected_date_additional_payment_6}
+        - {amount_prop: collected_amount__additional_payment_7, date_prop: collected_date_additional_payment_7}
+        - {amount_prop: collected_amount__additional_payment_8, date_prop: collected_date_additional_payment_8}
+        - {amount_prop: collected_amount__additional_payment_9, date_prop: collected_date_additional_payment_9}
+        - {amount_prop: collected_amount__additional_payment_10, date_prop: collected_date_additional_payment_10}
+        - {amount_prop: collected_amount__additional_payment_11, date_prop: collected_date_additional_payment_11}
+        - {amount_prop: collected_amount__additional_payment_12, date_prop: collected_date_additional_payment_12}
     comparison: {mode: exact, tolerance: 1.00}
     caveats: ["upsell_plan value list transcribed from seeds/dim_product_map.csv -- re-sync this list if the seed changes"]
 
@@ -327,12 +343,20 @@ metrics:
           operator: IN
           value: ["Upgrade - Mastermind Pro", "Upgrade - Mastermind Premium", "Restart - Mastermind Pro",
                    "Restart - Mastermind Premium", "Renewal - Mastermind Lite", "Winback - MM Pro", "Winback - MM Premium"]
-      components:
+      components:   # base at the deal's Renewal Close Date, each additional payment at its own Collected Date (Celeste, 2026-10-21); a payment with no date is skipped. HubSpot internal names, verified live 2026-10-21
         - {amount_prop: cash_collected, date_prop: upsell___close_date}
-        - {amount_prop: additional_payment_1_amount, date_prop: additional_payment_1_stamped_date}
-        - {amount_prop: additional_payment_2_amount, date_prop: additional_payment_2_stamped_date}
-        - {amount_prop: collected_amount__additional_payment_3, date_prop: collected_date__additional_payment_3}
-        - {amount_prop: collected_amount__additional_payment_4, date_prop: collected_date__additional_payment_4}
+        - {amount_prop: additional_payment__1_amount, date_prop: additional_payment__1_stamped_date}
+        - {amount_prop: additional_payment__2_amount, date_prop: additional_payment__2_stamped_date}
+        - {amount_prop: collected_amount__additional_payment_3, date_prop: collected_date_additional_payment_3}
+        - {amount_prop: collected_amount__additional_payment_4, date_prop: collected_date_additional_payment_4}
+        - {amount_prop: collected_amount__additional_payment_5, date_prop: collected_date_additional_payment_5}
+        - {amount_prop: collected_amount__additional_payment_6, date_prop: collected_date_additional_payment_6}
+        - {amount_prop: collected_amount__additional_payment_7, date_prop: collected_date_additional_payment_7}
+        - {amount_prop: collected_amount__additional_payment_8, date_prop: collected_date_additional_payment_8}
+        - {amount_prop: collected_amount__additional_payment_9, date_prop: collected_date_additional_payment_9}
+        - {amount_prop: collected_amount__additional_payment_10, date_prop: collected_date_additional_payment_10}
+        - {amount_prop: collected_amount__additional_payment_11, date_prop: collected_date_additional_payment_11}
+        - {amount_prop: collected_amount__additional_payment_12, date_prop: collected_date_additional_payment_12}
     comparison: {mode: exact, tolerance: 1.00}
     caveats: []
 
@@ -361,12 +385,20 @@ metrics:
           value: ["Bronze", "Gold", "Platinum", "Renewal - Diamond", "Renewal - Silver",
                    "Upgrade Bronze to Gold", "Upgrade Gold to Platinum", "WB Renewal - Gold",
                    "WB Renewal - Bronze", "WB Renewal - Platinum", "Winback - Silver"]
-      components:
+      components:   # base at the deal's Renewal Close Date, each additional payment at its own Collected Date (Celeste, 2026-10-21); a payment with no date is skipped. HubSpot internal names, verified live 2026-10-21
         - {amount_prop: cash_collected, date_prop: upsell___close_date}
-        - {amount_prop: additional_payment_1_amount, date_prop: additional_payment_1_stamped_date}
-        - {amount_prop: additional_payment_2_amount, date_prop: additional_payment_2_stamped_date}
-        - {amount_prop: collected_amount__additional_payment_3, date_prop: collected_date__additional_payment_3}
-        - {amount_prop: collected_amount__additional_payment_4, date_prop: collected_date__additional_payment_4}
+        - {amount_prop: additional_payment__1_amount, date_prop: additional_payment__1_stamped_date}
+        - {amount_prop: additional_payment__2_amount, date_prop: additional_payment__2_stamped_date}
+        - {amount_prop: collected_amount__additional_payment_3, date_prop: collected_date_additional_payment_3}
+        - {amount_prop: collected_amount__additional_payment_4, date_prop: collected_date_additional_payment_4}
+        - {amount_prop: collected_amount__additional_payment_5, date_prop: collected_date_additional_payment_5}
+        - {amount_prop: collected_amount__additional_payment_6, date_prop: collected_date_additional_payment_6}
+        - {amount_prop: collected_amount__additional_payment_7, date_prop: collected_date_additional_payment_7}
+        - {amount_prop: collected_amount__additional_payment_8, date_prop: collected_date_additional_payment_8}
+        - {amount_prop: collected_amount__additional_payment_9, date_prop: collected_date_additional_payment_9}
+        - {amount_prop: collected_amount__additional_payment_10, date_prop: collected_date_additional_payment_10}
+        - {amount_prop: collected_amount__additional_payment_11, date_prop: collected_date_additional_payment_11}
+        - {amount_prop: collected_amount__additional_payment_12, date_prop: collected_date_additional_payment_12}
     comparison: {mode: exact, tolerance: 1.00}
     caveats: []
 

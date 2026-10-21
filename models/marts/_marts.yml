@@ -4,15 +4,17 @@ models:
   - name: fct_renewal_cash
     description: >
       Payment-grain cash fact: one row per (deal, cash component), where a component is the base
-      Cash Collected plus AP1-AP12 (all twelve wired as of 2026-09-01, PR #27). Each component is
-      dated in ET by its own stamp date, so a payment plan lands in the month it collected, not the
-      month the deal closed. Carries three independent splits of the same cash: product_column
+      Cash Collected plus AP1-AP12 (all twelve wired as of 2026-09-01, PR #27). Base cash is dated in ET
+      at the deal's Renewal Close Date and each additional payment at its own Collected Date (approved
+      2026-10-21; additional payments without a Collected Date are excluded). A payment plan's installments
+      land in the month they were collected, not the month the deal closed. Count won deals from the
+      `base` component only: a payment-only deal is not newly won. Carries three independent splits of the same cash: product_column
       (tier renewed into), tier_of_origin_column (tier renewed from), pipeline_type (commercial
       motion). Sum cash_amount at query time for any window.
     # cash_amount non-negativity enforced by tests/assert_cash_nonnegative.sql (no dbt_utils dependency)
     columns:
       - name: cash_date_et
-        description: "ET date this component collected. The only date on this model -- there is no close date here."
+        description: "ET date this component counts on: the Renewal Close Date for the base component, the Collected Date for AP1-AP12. There is no separate close-date column."
         tests: [not_null]
       - name: product_column
         description: "Product tier renewed into, from dim_product_map.csv; WINBACK for any Winbacks Pipeline deal."
