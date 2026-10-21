@@ -2,6 +2,7 @@ active_product_snapshot_at_won,tier_of_origin_column,notes
 Mastermind Pro,MM_TIER,Tier-of-origin per Celeste 2026-08-12 - what they were on before this renewal
 Mastermind Premium,MM_TIER,Tier-of-origin per Celeste 2026-08-12
 Upgrade - Mastermind Pro,MM_TIER,Tier-of-origin per Celeste 2026-08-12
+Upgrade - Mastermind Premium,MM_TIER,Found UNMAPPED 2026-10-21 via APPU tier reconciliation (deal 64203934383 $4800 Sep 2026) - same pattern as Upgrade - Mastermind Pro above
 Restart - Mastermind Pro,MM_TIER,Tier-of-origin per Celeste 2026-08-12
 Mastermin Pro,MM_TIER,Typo variant of 'Mastermind Pro' - Celeste fixed the source deal directly in HubSpot 2026-08-12; kept as a defensive fallback in case Fivetran hasn't re-synced yet or the same typo recurs elsewhere
 Accelerator Gems,ACC_TIER,Tier-of-origin per Celeste 2026-08-12
