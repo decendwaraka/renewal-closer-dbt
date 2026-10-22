@@ -24,7 +24,7 @@ models:
     description: "One row per (meeting_id, contact_id) for COMPLETED closer-owned live calls, matching the team's HubSpot 'Live to Close Rate' report (2026-10-18). Types: Renewal Accelerator, Renewal Strategy, Renewal Post Webinar Call, Mentor Handoff, Winback Call, Winback Webinar -- legacy Renewal Winback Call excluded. is_won_after_meeting = the contact has any closed-won deal (renewal or win-back stage, any owner) with close date on or after the meeting date, no upper bound. Close Rate = COUNT(DISTINCT won contacts) / COUNT(DISTINCT contacts) over the window, counted at query time."
 
   - name: int_renewal__pc_close_deals
-    description: "One row per (deal, qualifying meeting) for PC Close % (HubSpot report 445343752, 2026-10-21). See the model header: stage-history exclusion across both pipelines, completed Renewal 3 Month / Accelerator 3 month meeting linked via deal OR contact, won = closed-won stages, deal-owner attribution, no pipeline filter, Post Webinar 30d flag deliberately not applied. Backtest all-time: 2,247 deals / 161 won vs report 2,246 / 161."
+    description: "One row per (deal, qualifying meeting) for PC Close % (HubSpot report 445343752, 2026-10-21). See the model header: stage-history exclusion across both pipelines, completed Renewal 3 Month / Accelerator 3 month meeting joined through a contact (meeting -> contact -> deal, as in the report; a direct meeting-to-deal link alone does not count), won = closed-won stages, deal-owner attribution, no pipeline filter, Post Webinar 30d flag deliberately not applied. Equals the report's 2026-10-22 export row for row (2,259 deals / 161 won)."
 
 unit_tests:
   - name: test_deal_cash_dates_base_at_close_and_payments_at_collected_date
@@ -117,12 +117,14 @@ unit_tests:
 
   - name: test_pc_close_deals_population_and_attribution
     description: >
-      PC Close % population (HubSpot report 445343752). A completed Renewal 3 Month meeting linked via the
-      deal counts (deal 100, won, roster owner); a completed Accelerator 3 month meeting linked only via the
-      contact counts (deal 200, open, off-roster owner -> closer_name null, still in the denominator). A
-      meeting that reaches the same deal through BOTH the deal and the contact links yields one row (meeting
-      6 / deal 100). Out: COMPLETED - NURTURE, a non-3-Month type (Renewal Strategy), and any deal that has
-      ever entered an excluded stage (deal 300).
+      PC Close % population (HubSpot report 445343752). A meeting reaches a deal only through a contact:
+      meeting -> contact -> deal, as in the report (Contacts primary). Completed Renewal 3 Month meeting 1
+      reaches deal 100 (won, roster owner); completed Accelerator 3 month meeting 2 reaches deal 200 (open,
+      off-roster owner -> closer_name null, still in the denominator). Meeting 7 has two contacts that both
+      belong to deal 100 and yields one row. Out: COMPLETED - NURTURE (3), a non-3-Month type, Renewal
+      Strategy (5), a deal that ever entered an excluded stage (deal 300 via meeting 4), and meeting 6, a
+      completed 3 Month meeting with no contact at all -- the report cannot see it, so it never counts even
+      if the meeting links straight to a deal.
     model: int_renewal__pc_close_deals
     given:
       - input: ref('stg_renewal__meetings')
@@ -133,21 +135,22 @@ unit_tests:
           - {meeting_id: 4, owner_id: '1', activity_type: 'Renewal 3 Month', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-09-13 16:00:00"}
           - {meeting_id: 5, owner_id: '1', activity_type: 'Renewal Strategy', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-09-14 16:00:00"}
           - {meeting_id: 6, owner_id: '1', activity_type: 'Renewal 3 Month', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-09-15 16:00:00"}
-      - input: source('hubspot_raw', 'ENGAGEMENT_DEAL')
-        rows:
-          - {engagement_id: 1, deal_id: 100}
-          - {engagement_id: 3, deal_id: 100}
-          - {engagement_id: 4, deal_id: 300}
-          - {engagement_id: 5, deal_id: 100}
-          - {engagement_id: 6, deal_id: 100}
+          - {meeting_id: 7, owner_id: '1', activity_type: 'Renewal 3 Month', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-09-16 16:00:00"}
       - input: ref('stg_renewal__engagement_contacts')
         rows:
+          - {meeting_id: 1, contact_id: 'C100'}
           - {meeting_id: 2, contact_id: 'C200'}
-          - {meeting_id: 6, contact_id: 'C100'}
+          - {meeting_id: 3, contact_id: 'C100'}
+          - {meeting_id: 4, contact_id: 'C300'}
+          - {meeting_id: 5, contact_id: 'C100'}
+          - {meeting_id: 7, contact_id: 'C100'}
+          - {meeting_id: 7, contact_id: 'C101'}
       - input: ref('stg_renewal__deal_contact_pairs')
         rows:
-          - {deal_id: 200, contact_id: 'C200'}
           - {deal_id: 100, contact_id: 'C100'}
+          - {deal_id: 100, contact_id: 'C101'}
+          - {deal_id: 200, contact_id: 'C200'}
+          - {deal_id: 300, contact_id: 'C300'}
       - input: ref('stg_renewal__deals')
         rows:
           - {deal_id: 100, closer_owner_id: '82672208', dealstage_id: '175346331', ever_entered_pc_close_excluded_stage: false}
@@ -160,7 +163,7 @@ unit_tests:
       rows:
         - {deal_id: '100', meeting_id: 1, meeting_date_et: "2026-09-10", closer_owner_id: '82672208', closer_name: 'Sufijan Cunningham', is_won: true}
         - {deal_id: '200', meeting_id: 2, meeting_date_et: "2026-09-11", closer_owner_id: '99999999', closer_name: null, is_won: false}
-        - {deal_id: '100', meeting_id: 6, meeting_date_et: "2026-09-15", closer_owner_id: '82672208', closer_name: 'Sufijan Cunningham', is_won: true}
+        - {deal_id: '100', meeting_id: 7, meeting_date_et: "2026-09-16", closer_owner_id: '82672208', closer_name: 'Sufijan Cunningham', is_won: true}
 
   - name: test_meetings_first_call_dedup_per_deal_and_category
     description: "Only the earliest completed RC/PWC/WB call per (deal_id, meeting_category) is_first_call; a later completed call on the same deal+category is a follow-up (false). Canceled calls don't count toward ranking, so a completed call with an earlier canceled call still comes out first. PC is out of scope for dedup (always true). A call with no HubSpot deal association can't be identified as a follow-up, so it defaults to true rather than being dropped (OPEN_ISSUES #23)."
