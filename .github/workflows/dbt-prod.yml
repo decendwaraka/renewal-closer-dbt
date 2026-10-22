@@ -56,5 +56,22 @@ jobs:
       - name: dbt debug (connection check)
         run: dbt debug --target prod
 
+      # Seeds are repo-owned mapping files (tier, product, closer, stage maps). Without this a
+      # merged seed edit never reaches prod -- dbt#37's tier-map fix sat unapplied for this reason.
+      # Plain `dbt seed`, not --full-refresh: a column change then fails loudly instead of
+      # dropping and recreating the table (and its grants) every 2 hours.
+      # continue-on-error so a seed failure can't stop the model refresh below; the last step
+      # still fails the job so it shows red.
+      - name: dbt seed (prod)
+        id: seed
+        continue-on-error: true
+        run: dbt seed --target prod
+
       - name: dbt run (prod)
         run: dbt run --target prod
+
+      - name: Fail if dbt seed failed
+        if: steps.seed.outcome == 'failure'
+        run: |
+          echo "dbt seed (prod) failed -- models refreshed, but seed edits did not reach prod."
+          exit 1
