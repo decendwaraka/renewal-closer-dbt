@@ -24,7 +24,7 @@ models:
     description: "One row per (meeting_id, contact_id) for COMPLETED closer-owned live calls, matching the team's HubSpot 'Live to Close Rate' report (2026-10-18). Types: Renewal Accelerator, Renewal Strategy, Renewal Post Webinar Call, Mentor Handoff, Winback Call, Winback Webinar -- legacy Renewal Winback Call excluded. is_won_after_meeting = the contact has any closed-won deal (renewal or win-back stage, any owner) with close date on or after the meeting date, no upper bound. Close Rate = COUNT(DISTINCT won contacts) / COUNT(DISTINCT contacts) over the window, counted at query time."
 
   - name: int_renewal__pc_close_deals
-    description: "One row per (deal, qualifying meeting) for PC Close % (HubSpot report 445343752, 2026-10-21). See the model header: stage-history exclusion across both pipelines, completed Renewal 3 Month / Accelerator 3 month meeting joined through a contact (meeting -> contact -> deal, as in the report; a direct meeting-to-deal link alone does not count), won = closed-won stages, deal-owner attribution, no pipeline filter, Post Webinar 30d flag deliberately not applied. Equals the report's 2026-10-22 export row for row (2,259 deals / 161 won)."
+    description: "One row per (deal, qualifying meeting) for PC Close % (HubSpot report 445343752, 2026-10-21). See the model header: Renewal Pipeline (898243912) deals only, stage-history exclusion across both pipelines, completed Renewal 3 Month / Accelerator 3 month meeting joined through a contact (meeting -> contact -> deal, as in the report; a direct meeting-to-deal link alone does not count), won = closed-won stages, deal-owner attribution, no pipeline filter, Post Webinar 30d flag deliberately not applied. Equals the report (Oct 1-22 2026 with its pipeline filter: 68 deals / 1 won / 1.47%)."
 
 unit_tests:
   - name: test_deal_cash_dates_base_at_close_and_payments_at_collected_date
@@ -122,9 +122,10 @@ unit_tests:
       reaches deal 100 (won, roster owner); completed Accelerator 3 month meeting 2 reaches deal 200 (open,
       off-roster owner -> closer_name null, still in the denominator). Meeting 7 has two contacts that both
       belong to deal 100 and yields one row. Out: COMPLETED - NURTURE (3), a non-3-Month type, Renewal
-      Strategy (5), a deal that ever entered an excluded stage (deal 300 via meeting 4), and meeting 6, a
+      Strategy (5), a deal that ever entered an excluded stage (deal 300 via meeting 4), meeting 6, a
       completed 3 Month meeting with no contact at all -- the report cannot see it, so it never counts even
-      if the meeting links straight to a deal.
+      if the meeting links straight to a deal -- and deal 400 (via meeting 8), which sits in a pipeline
+      other than the Renewal Pipeline, as the report's pipeline filter leaves it out.
     model: int_renewal__pc_close_deals
     given:
       - input: ref('stg_renewal__meetings')
@@ -136,6 +137,7 @@ unit_tests:
           - {meeting_id: 5, owner_id: '1', activity_type: 'Renewal Strategy', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-09-14 16:00:00"}
           - {meeting_id: 6, owner_id: '1', activity_type: 'Renewal 3 Month', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-09-15 16:00:00"}
           - {meeting_id: 7, owner_id: '1', activity_type: 'Renewal 3 Month', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-09-16 16:00:00"}
+          - {meeting_id: 8, owner_id: '1', activity_type: 'Renewal 3 Month', meeting_outcome: 'COMPLETED', meeting_start_at: "2026-09-17 16:00:00"}
       - input: ref('stg_renewal__engagement_contacts')
         rows:
           - {meeting_id: 1, contact_id: 'C100'}
@@ -145,17 +147,20 @@ unit_tests:
           - {meeting_id: 5, contact_id: 'C100'}
           - {meeting_id: 7, contact_id: 'C100'}
           - {meeting_id: 7, contact_id: 'C101'}
+          - {meeting_id: 8, contact_id: 'C400'}
       - input: ref('stg_renewal__deal_contact_pairs')
         rows:
           - {deal_id: 100, contact_id: 'C100'}
           - {deal_id: 100, contact_id: 'C101'}
           - {deal_id: 200, contact_id: 'C200'}
           - {deal_id: 300, contact_id: 'C300'}
+          - {deal_id: 400, contact_id: 'C400'}
       - input: ref('stg_renewal__deals')
         rows:
-          - {deal_id: 100, closer_owner_id: '82672208', dealstage_id: '175346331', ever_entered_pc_close_excluded_stage: false}
-          - {deal_id: 200, closer_owner_id: '99999999', dealstage_id: '175346325', ever_entered_pc_close_excluded_stage: false}
-          - {deal_id: 300, closer_owner_id: '82672208', dealstage_id: '175346331', ever_entered_pc_close_excluded_stage: true}
+          - {deal_id: 100, closer_owner_id: '82672208', pipeline_id: '898243912', dealstage_id: '175346331', ever_entered_pc_close_excluded_stage: false}
+          - {deal_id: 200, closer_owner_id: '99999999', pipeline_id: '898243912', dealstage_id: '175346325', ever_entered_pc_close_excluded_stage: false}
+          - {deal_id: 300, closer_owner_id: '82672208', pipeline_id: '898243912', dealstage_id: '175346331', ever_entered_pc_close_excluded_stage: true}
+          - {deal_id: 400, closer_owner_id: '82672208', pipeline_id: '77634718', dealstage_id: '175346331', ever_entered_pc_close_excluded_stage: false}
       - input: ref('dim_closers')
         rows:
           - {owner_id: '82672208', closer_name: 'Sufijan Cunningham'}
