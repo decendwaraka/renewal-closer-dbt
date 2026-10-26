@@ -107,6 +107,20 @@ models:
                 - 'RESCHEDULED'
                 - 'SCHEDULED'
 
+  - name: fct_renewal_pipeline_owner_stage
+    description: >
+      Renewal Pipeline Snapshot, replicating the HubSpot report of the same name: all deals currently in
+      the Renewal Pipeline (898243912) by deal owner and current deal stage. One row per (closer, stage),
+      zero counts included. All-time, unwindowed, no test-contact exclusion (the report has neither).
+      Team closers only (dim_closers.rep_team IS NOT NULL).
+    columns:
+      - name: closer_owner_id
+        tests: [not_null]
+      - name: stage_id
+        tests: [not_null]
+      - name: deal_count
+        tests: [not_null]
+
   - name: fct_renewal_pipeline_snapshot
     description: >
       Per-closer deal-stage fact (#36-#51): one row per (deal, current snapshot_col bucket), dated by
