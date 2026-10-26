@@ -124,6 +124,24 @@ models:
       - name: create_date_et
         tests: [not_null]
       # one row per deal_id enforced by tests/assert_pipeline_owner_stage_unique_deal.sql
+  - name: fct_winback_pipeline_owner_stage
+    description: >
+      Winback Pipeline Snapshot, replicating the HubSpot report of the same name: deal-grain fact of every
+      deal in the Winbacks Pipeline (917643668) with its owner and CURRENT deal stage, dated by
+      create_date_et so any create-date window can be applied downstream (COUNT(*) by owner and stage).
+      An (owner, stage) cell with no deals has no row; the consumer zero-fills. Team closers plus deals
+      with no owner (closer_name 'Unassigned', closer_owner_id NULL), as in the report's owner filter. No
+      test-contact exclusion (the report has none).
+    columns:
+      - name: deal_id
+        tests: [not_null]
+      - name: closer_name
+        tests: [not_null]
+      - name: stage_id
+        tests: [not_null]
+      - name: create_date_et
+        tests: [not_null]
+      # one row per deal_id enforced by tests/assert_winback_owner_stage_unique_deal.sql
 
   - name: fct_renewal_pipeline_snapshot
     description: >
