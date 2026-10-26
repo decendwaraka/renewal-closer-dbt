@@ -109,17 +109,21 @@ models:
 
   - name: fct_renewal_pipeline_owner_stage
     description: >
-      Renewal Pipeline Snapshot, replicating the HubSpot report of the same name: all deals currently in
-      the Renewal Pipeline (898243912) by deal owner and current deal stage. One row per (closer, stage),
-      zero counts included. All-time, unwindowed, no test-contact exclusion (the report has neither).
-      Team closers only (dim_closers.rep_team IS NOT NULL).
+      Renewal Pipeline Snapshot, replicating the HubSpot report of the same name: deal-grain fact of every
+      deal in the Renewal Pipeline (898243912) with its owner and CURRENT deal stage, dated by
+      create_date_et so any create-date window can be applied downstream (COUNT(*) by owner and stage).
+      An (owner, stage) cell with no deals has no row; the consumer zero-fills. No test-contact exclusion
+      (the report has none). Team closers only (dim_closers.rep_team IS NOT NULL).
     columns:
+      - name: deal_id
+        tests: [not_null]
       - name: closer_owner_id
         tests: [not_null]
       - name: stage_id
         tests: [not_null]
-      - name: deal_count
+      - name: create_date_et
         tests: [not_null]
+      # one row per deal_id enforced by tests/assert_pipeline_owner_stage_unique_deal.sql
 
   - name: fct_renewal_pipeline_snapshot
     description: >
@@ -302,3 +306,24 @@ unit_tests:
     expect:
       rows:
         - {closer_owner_id: '82672208', closer_name: 'Sufijan Cunningham', pipeline_id: '898243912', stage_group: 'renewal_pipeline', snapshot_col: 'new_member', deal_id: 1, entry_date_et: '2026-10-01'}
+
+  - name: test_pipeline_owner_stage_scopes_pipeline_and_team
+    description: "Only Renewal Pipeline deals owned by team closers (rep_team set) appear, each with its current stage and create_date_et; other pipelines and off-team owners drop out. create_date_et is the ET calendar day, so a late-evening ET create lands on that day, not the next UTC day."
+    model: fct_renewal_pipeline_owner_stage
+    given:
+      - input: ref('stg_renewal__deals')
+        rows:
+          - {deal_id: 1, closer_owner_id: '82672208', pipeline_id: '898243912', dealstage_id: '1359829634', created_at: '2026-09-01T02:30:00+00:00'}
+          - {deal_id: 2, closer_owner_id: '82672208', pipeline_id: '95211801', dealstage_id: '175346325', created_at: '2026-09-10T15:00:00+00:00'}
+          - {deal_id: 3, closer_owner_id: '76930546', pipeline_id: '898243912', dealstage_id: '1359829634', created_at: '2026-09-10T15:00:00+00:00'}
+      - input: ref('dim_renewal_stages')
+        rows:
+          - {stage_id: '1359829634', pipeline_id: '898243912', stage_label: 'New Member', snapshot_col: 'new_member'}
+          - {stage_id: '175346325', pipeline_id: '95211801', stage_label: 'Progress Call Scheduled', snapshot_col: 'pc_scheduled'}
+      - input: ref('dim_closers')
+        rows:
+          - {owner_id: '82672208', closer_name: 'Sufijan Cunningham', rep_team: 'ACC'}
+          - {owner_id: '76930546', closer_name: 'Henna Shakoor', rep_team: null}
+    expect:
+      rows:
+        - {deal_id: 1, closer_owner_id: '82672208', closer_name: 'Sufijan Cunningham', stage_id: '1359829634', stage_label: 'New Member', snapshot_col: 'new_member', stage_order: 1, create_date_et: '2026-08-31'}

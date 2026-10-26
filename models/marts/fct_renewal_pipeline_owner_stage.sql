@@ -1,22 +1,24 @@
 {{ config(materialized='view') }}
 
--- Renewal Pipeline Snapshot: every deal currently in the Renewal Pipeline (898243912), broken down by
--- deal owner and CURRENT deal stage. Replicates the HubSpot report of the same name cell for cell
--- (48/48 cells checked live against HubSpot and raw Snowflake, 2026-10-26).
+-- Renewal Pipeline Snapshot: every deal in the Renewal Pipeline (898243912), by deal owner and CURRENT
+-- deal stage, dated by the deal's create date. Replicates the HubSpot report of the same name cell for
+-- cell: all-time 48/48, and the Aug / Sep / MTD create-date windows 144/144 against live HubSpot
+-- (2026-10-26; the only difference was one deal moved after the last Fivetran sync).
 --
--- Grain: one row per (closer, stage), zeros included (a closer with no deals in a stage still gets a
--- row, e.g. Red Zone), so the frontend can pivot without back-filling gaps.
+-- Grain: one row per deal, carrying create_date_et, same convention as fct_renewal_cash and
+-- fct_renewal_pipeline_snapshot, so any date window can be applied downstream. Counts are therefore
+-- COUNT(*) at query time, and an (owner, stage) cell with no deals has NO row -- the consumer zero-fills.
 --
--- Deliberately NOT the same as fct_renewal_pipeline_snapshot: that model is windowed by the date a deal
--- entered its current stage, drops test-contact deals, and spans the old pipeline and Win-Back. This
--- report is all-time, unwindowed, and applies none of those filters -- HubSpot's report has no test-contact
--- or date filter, and adding either would make the numbers diverge from it.
+-- Deliberately NOT fct_renewal_pipeline_snapshot: that model is windowed by the date a deal entered its
+-- current stage, drops test-contact deals, and spans the old pipeline and Win-Back. This report is
+-- windowed by create date and applies no test-contact filter -- HubSpot's report has none, and adding one
+-- would make the numbers diverge from it.
 --
 -- Report scope: Renewal Pipeline only (new_renewal_pipeline_id), and the four team closers only
 -- (rep_team IS NOT NULL drops Henna Shakoor, who is off the team and not in the report's owner filter).
 
 WITH deals AS (
-    SELECT deal_id, closer_owner_id, dealstage_id
+    SELECT deal_id, closer_owner_id, dealstage_id, created_at
     FROM {{ ref('stg_renewal__deals') }}
     WHERE pipeline_id = '{{ var("new_renewal_pipeline_id") }}'
 ),
@@ -48,23 +50,17 @@ stages AS (
         END AS stage_order
     FROM {{ ref('dim_renewal_stages') }}
     WHERE pipeline_id = '{{ var("new_renewal_pipeline_id") }}'
-),
-
-counts AS (
-    SELECT closer_owner_id, dealstage_id, COUNT(DISTINCT deal_id) AS deal_count
-    FROM deals
-    GROUP BY 1, 2
 )
 
 SELECT
+    d.deal_id,
     c.owner_id          AS closer_owner_id,
     c.closer_name,
     s.stage_id,
     s.stage_label,
     s.snapshot_col,
     s.stage_order,
-    COALESCE(n.deal_count, 0) AS deal_count
-FROM closers AS c
-CROSS JOIN stages AS s
-LEFT JOIN counts AS n
-    ON n.closer_owner_id = c.owner_id AND n.dealstage_id = s.stage_id
+    {{ to_et_date('d.created_at') }} AS create_date_et
+FROM deals AS d
+INNER JOIN closers AS c ON d.closer_owner_id = c.owner_id
+INNER JOIN stages AS s ON d.dealstage_id = s.stage_id

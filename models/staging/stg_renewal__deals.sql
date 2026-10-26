@@ -27,6 +27,7 @@ renamed AS (
         deal_pipeline_id::VARCHAR                                   AS pipeline_id,
         deal_pipeline_stage_id::VARCHAR                             AS dealstage_id,
         property_upsell_close_date                                  AS close_date,
+        property_createdate                                         AS created_at,
 
         -- PC Due midpoint start-date fallback (Travis/Celeste decision, 2026-08-15): membership
         -- midpoint = midpoint(start date, Membership Expiration Date), where start date prioritizes
