@@ -4,7 +4,7 @@ models:
   - name: int_renewal__won_deals
     description: "Closed-won renewal deals owned by a current closer, with ET close date and cash inputs."
   - name: int_renewal__deal_cash
-    description: "Cash exploded to (deal, component) grain: base Cash Collected dated at the deal's Renewal Close Date, additional payments AP1-AP12 each dated at their own Collected Date (approved by Celeste 2026-10-21, all historical months). Only additional payments with a Collected Date count."
+    description: "Cash exploded to (deal, component) grain: every component -- base Cash Collected and additional payments AP1-AP12 -- dated at the deal's Renewal Close Date (changed 2026-11-02 to match the Renewal Setter dashboard's close_date cash basis, so Total Cash ties across both dashboards). An additional payment counts as long as it has an amount and the deal has a Renewal Close Date; its own Collected Date is not used for bucketing."
   - name: int_renewal__meetings
     description: >
       Renewal meetings categorized PC/RC/PWC/WB (plus WB_FOLLOW_UP and WB_WEBINAR, Call Outcomes only
@@ -27,14 +27,17 @@ models:
     description: "One row per (deal, qualifying meeting) for PC Close % (HubSpot report 445343752, 2026-10-21). See the model header: Renewal Pipeline (898243912) deals only, stage-history exclusion across both pipelines, completed Renewal 3 Month / Accelerator 3 month meeting joined through a contact (meeting -> contact -> deal, as in the report; a direct meeting-to-deal link alone does not count), won = closed-won stages, deal-owner attribution, no pipeline filter, Post Webinar 30d flag deliberately not applied. Equals the report (Oct 1-22 2026 with its pipeline filter: 68 deals / 1 won / 1.47%)."
 
 unit_tests:
-  - name: test_deal_cash_dates_base_at_close_and_payments_at_collected_date
+  - name: test_deal_cash_dates_every_payment_at_the_deal_close_date
     description: >
-      Approved definition (Celeste Magre, 2026-10-21): base Cash Collected is dated at the deal's
-      Renewal Close Date and every additional payment at its own Collected Date. Deal 1 closed Sep 12
-      with an additional payment collected Oct 3: base is Sep 12, the payment is Oct 3. Deal 2's
-      additional payment has an amount but no Collected Date, so it makes no row (only payments with the
-      date filled in count). Deal 3 has no Renewal Close Date: no base row, but its dated additional
-      payment still counts on its collected date. Deal 4's additional payment is $0 and makes no row.
+      Changed 2026-11-02 to match the Renewal Setter dashboard's close_date cash basis (supersedes the
+      2026-10-21 "AP at its own Collected Date" rule): every component -- base Cash Collected and every
+      additional payment -- is dated at the deal's Renewal Close Date. Deal 1 closed Sep 12 with an
+      additional payment collected Oct 3: both base and the payment land on Sep 12, the close date --
+      the payment's own Collected Date (Oct 3) is not used. Deal 2's additional payment has an amount
+      but no Collected Date; it still counts, dated at the deal's close date, since only the amount and
+      the deal's close date matter now. Deal 3 has no Renewal Close Date: NEITHER base NOR its additional
+      payment makes a row, even though the payment has its own Collected Date -- a deal with no close
+      date contributes nothing. Deal 4's additional payment is $0 and makes no row.
       The input is fed as SQL because int_renewal__won_deals is ephemeral (dbt cannot introspect a
       relation that does not exist).
     model: int_renewal__deal_cash
@@ -52,9 +55,9 @@ unit_tests:
     expect:
       rows:
         - {deal_id: 1, cash_component: 'base', cash_date_et: "2026-09-12", cash_amount: 10000}
-        - {deal_id: 1, cash_component: 'ap1', cash_date_et: "2026-10-03", cash_amount: 2500}
+        - {deal_id: 1, cash_component: 'ap1', cash_date_et: "2026-09-12", cash_amount: 2500}
         - {deal_id: 2, cash_component: 'base', cash_date_et: "2026-09-20", cash_amount: 6800}
-        - {deal_id: 3, cash_component: 'ap1', cash_date_et: "2026-08-15", cash_amount: 500}
+        - {deal_id: 2, cash_component: 'ap2', cash_date_et: "2026-09-20", cash_amount: 1200}
         - {deal_id: 4, cash_component: 'base', cash_date_et: "2026-10-02", cash_amount: 4800}
 
   - name: test_live_call_contacts_types_outcome_and_won_after_meeting
