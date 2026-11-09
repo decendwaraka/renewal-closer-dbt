@@ -11,9 +11,19 @@
 -- which is also where categorization lives -- keeping the two together means the unit tests can feed a
 -- raw HubSpot string and actually exercise the normalization.
 
+--
+-- Deleted meetings: Fivetran does not capture HubSpot engagement deletes, so _fivetran_deleted alone left
+-- 11 deleted October 2026 meetings live here (+5 DPL calls, +11 Call Outcomes Scheduled vs HubSpot). The
+-- HUBSPOT_DELETED_MEETINGS list (see _sources.yml) closes that gap, the same filter renewal-setter uses.
+
 WITH source AS (
-    SELECT * FROM {{ source('hubspot_raw', 'ENGAGEMENT_MEETING') }}
-    WHERE COALESCE(_fivetran_deleted, FALSE) = FALSE
+    SELECT m.* FROM {{ source('hubspot_raw', 'ENGAGEMENT_MEETING') }} AS m
+    WHERE COALESCE(m._fivetran_deleted, FALSE) = FALSE
+      AND NOT EXISTS (
+          SELECT 1
+          FROM {{ source('hubspot_raw', 'HUBSPOT_DELETED_MEETINGS') }} AS d
+          WHERE d.meeting_id = m.engagement_id
+      )
 ),
 
 renamed AS (

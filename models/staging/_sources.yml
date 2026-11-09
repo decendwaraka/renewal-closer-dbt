@@ -15,6 +15,24 @@ sources:
         description: "HubSpot deals (Fivetran-landed). Renewal cash, close date, stage, owner."
       - name: ENGAGEMENT_MEETING
         description: "Meeting engagements. Renewal PC/RC/PWC calls by hs_activity_type."
+      # Meeting ids deleted in HubSpot but still live in ENGAGEMENT_MEETING: Fivetran does not capture
+      # engagement deletes. Not a Fivetran table. Written by renewal-setter's
+      # scripts/detect_deleted_meetings.py (GitHub Actions: recent window every 6 h, full history daily),
+      # which checks every meeting id, not just setter types. Rows only arrive when something is deleted,
+      # so source freshness is off; tests/assert_deleted_meetings_detection_fresh.sql watches the runs.
+      - name: HUBSPOT_DELETED_MEETINGS
+        description: "Meeting ids confirmed deleted in HubSpot (batch read returned nothing). Excluded in stg_renewal__meetings."
+        config:
+          freshness: null
+        columns:
+          - name: meeting_id
+            data_tests:
+              - unique
+              - not_null
+      - name: HUBSPOT_DELETED_MEETINGS_RUNS
+        description: "One row per detector run. Read by tests/assert_deleted_meetings_detection_fresh.sql."
+        config:
+          freshness: null
       - name: ENGAGEMENT_DEAL
         description: "Meeting-to-deal association (engagement_id -> deal_id). Used for first-call dedup (OPEN_ISSUES #23)."
       - name: OWNER

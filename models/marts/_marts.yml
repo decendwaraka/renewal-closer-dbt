@@ -39,7 +39,7 @@ models:
               values: ['Upgrade', 'Restart', 'Renewal', 'Win-Back', 'UNMAPPED']
 
   - name: fct_renewal_live_call_contacts
-    description: "(meeting, contact)-grain fact behind the Leaderboard's Live Call Close %, matching the team's HubSpot 'Live to Close Rate' report. Close % = COUNT(DISTINCT IFF(is_won_after_meeting, contact_id, NULL)) / COUNT(DISTINCT contact_id) over meeting_date_et; the team rate is distinct across closers, not a sum. DPL does NOT use this -- it stays on fct_renewal_meetings.is_closing_call."
+    description: "(meeting, contact)-grain fact behind the Leaderboard's Live Call Close %, matching the team's HubSpot 'Live to Close Rate' report. Close % = COUNT(DISTINCT IFF(is_won_after_meeting, contact_id, NULL)) / COUNT(DISTINCT contact_id) over meeting_date_et; DPL does NOT use this -- see fct_renewal_dpl_call_contacts."
     columns:
       - name: meeting_id
         tests: [not_null]
@@ -49,8 +49,19 @@ models:
         tests: [not_null]
       # one row per (meeting_id, contact_id) enforced by tests/assert_live_call_contacts_unique_pair.sql
 
+  - name: fct_renewal_dpl_call_contacts
+    description: "(meeting, contact)-grain fact behind the Avg DPL denominator, matching the Renewal Closers Dashboard artifact (2026-11-09): distinct contacts on a meeting of the six DPL types, any outcome, by meeting owner and meeting_date_et. Count COUNT(DISTINCT contact_id) per closer and sum the closers for the team."
+    columns:
+      - name: meeting_id
+        tests: [not_null]
+      - name: contact_id
+        tests: [not_null]
+      - name: meeting_date_et
+        tests: [not_null]
+      # one row per (meeting_id, contact_id) enforced by tests/assert_dpl_call_contacts_unique_pair.sql
+
   - name: fct_renewal_pc_close_deals
-    description: "(deal, qualifying meeting)-grain fact behind PC Close % in Call Outcomes, replicating HubSpot report 445343752 (Celeste, 2026-10-21). Qualifying deal = never entered Renewal Call Complete - Nurture / Renewal Call Invited / Scheduled (either pipeline) with at least one COMPLETED Renewal 3 Month or Renewal Accelerator 3 month meeting joined through a contact (meeting -> contact -> deal, as in the report), Renewal Pipeline (898243912) only. Dated by meeting_date_et (approved window; NOT Renewal Close Date). PC Close % = COUNT(DISTINCT IFF(is_won, deal_id, NULL)) / COUNT(DISTINCT deal_id) over the window; attributed to the deal owner; closer_name IS NULL = off-roster or unassigned owner. The Post Webinar 30d flag is not applied (always 0 on these meetings)."
+    description: "(deal, qualifying meeting)-grain fact behind PC Close % in Call Outcomes, replicating HubSpot report 445343752 (Celeste, 2026-10-21). Qualifying deal = never entered Renewal Call Invited / Scheduled in the Renewal Pipeline (narrowed 2026-11-09 to match the Renewal Closers Dashboard artifact) with at least one COMPLETED Renewal 3 Month or Renewal Accelerator 3 month meeting joined through a contact (meeting -> contact -> deal, as in the report), Renewal Pipeline (898243912) only. Dated by meeting_date_et (approved window; NOT Renewal Close Date). PC Close % = COUNT(DISTINCT IFF(is_won, deal_id, NULL)) / COUNT(DISTINCT deal_id) over the window; attributed to the deal owner; closer_name IS NULL = off-roster or unassigned owner. The Post Webinar 30d flag is not applied (always 0 on these meetings)."
     columns:
       - name: deal_id
         tests: [not_null]

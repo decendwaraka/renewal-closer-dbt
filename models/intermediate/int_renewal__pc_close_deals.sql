@@ -1,7 +1,9 @@
 -- PC Close % population at (deal, qualifying meeting) grain. Replicates the team's HubSpot report 445343752
 -- (confirmed 2026-10-21 from its Configure / Filters screenshots, then backtested):
---   * deal has NEVER entered Renewal Call Complete - Nurture, or Renewal Call Invited / Scheduled in
---     either pipeline (stg_renewal__deals.ever_entered_pc_close_excluded_stage);
+--   * deal has NEVER entered Renewal Call Invited / Scheduled in the Renewal Pipeline
+--     (stg_renewal__deals.ever_entered_pc_close_excluded_stage). Narrowed 2026-11-09 to match the
+--     "Renewal Closers Dashboard" artifact, now the source of truth: Nurture and the old pipeline's
+--     Invited / Scheduled no longer exclude a deal;
 --   * deal has at least one COMPLETED Renewal 3 Month / Renewal Accelerator 3 month meeting, joined through a
 --     CONTACT: meeting -> contact -> deal. The report is built on Contacts (primary) with Deals and Meetings
 --     attached through each contact's associations, so a row only exists when one contact links both the
