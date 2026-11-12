@@ -1,12 +1,12 @@
 name: dbt run (prod)
 
-# Refreshes PRODUCTION.RENEWAL_* every 2 hours (cron is UTC), on every merge to main so model
+# Refreshes PRODUCTION.RENEWAL_* every 30 minutes (cron is UTC), on every merge to main so model
 # changes go live right away, and on demand from the Actions tab.
 on:
   push:
     branches: [main]
   schedule:
-    - cron: "0 */2 * * *"
+    - cron: "*/30 * * * *"
   workflow_dispatch:
 
 # Never let two prod runs overlap; let a running run finish rather than cancel it. GitHub keeps at
@@ -59,7 +59,7 @@ jobs:
       # Seeds are repo-owned mapping files (tier, product, closer, stage maps). Without this a
       # merged seed edit never reaches prod -- dbt#37's tier-map fix sat unapplied for this reason.
       # Plain `dbt seed`, not --full-refresh: a column change then fails loudly instead of
-      # dropping and recreating the table (and its grants) every 2 hours.
+      # dropping and recreating the table (and its grants) on every run.
       # continue-on-error so a seed failure can't stop the model refresh below; the last step
       # still fails the job so it shows red.
       - name: dbt seed (prod)
